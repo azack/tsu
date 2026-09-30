@@ -85,11 +85,12 @@ fi
 
 - The upgrade command uses the same package manager syntax as the initial installation
 - pnpm and yarn install from `github:bestdan/tsu`, which gets the latest code from the main branch. npm installs the latest release's tarball instead, because `npm install -g github:bestdan/tsu` leaves a broken symlink into npm's temporary clone directory
-- After installing, it runs `tsu --version` and fails if the `tsu` on `PATH` doesn't report the new version
+- After installing, it runs `tsu --version` and fails if the `tsu` on `PATH` is missing or older than the latest release
 - Requires appropriate permissions to install global packages
 - If the upgrade fails, you can manually reinstall:
   ```bash
-  npm install -g https://codeload.github.com/bestdan/tsu/tar.gz/refs/tags/v<version>
+  VERSION=0.29.0  # the latest release: https://github.com/bestdan/tsu/releases/latest
+  npm install -g "https://codeload.github.com/bestdan/tsu/tar.gz/refs/tags/v$VERSION"
   # or
   pnpm add -g github:bestdan/tsu
   # or
