@@ -61,7 +61,10 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
         with:
-          branch: bump-version-${{ github.sha }}
+          # One fixed branch, so each merge updates the open bump PR instead of
+          # opening a competing one for the same version. tag-version.yml keys
+          # on the bump-version- prefix.
+          branch: bump-version-next
           base: main
           title: "chore: bump version to ${{ env.VERSION }}"
           body: |
