@@ -3,6 +3,7 @@ import {
   upgradeFromGitHub,
   detectPackageManager,
   getTsuOnPath,
+  compareVersions,
 } from '../utils/version.js';
 import { logIfVerbose } from '../utils/logger.js';
 
@@ -46,7 +47,7 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
     upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestVersion);
 
     const onPath = getTsuOnPath();
-    if (onPath.version !== latestVersion) {
+    if (!onPath.version || compareVersions(onPath.version, latestVersion) < 0) {
       console.error(
         `❌ Installed ${latestVersion} with ${packageManager}, but the tsu on PATH (${onPath.path ?? 'not found'}) reports ${onPath.version ?? 'no version'}.`
       );
@@ -54,7 +55,7 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
       process.exit(1);
     }
 
-    logIfVerbose(verbose, `✓ Successfully upgraded to version ${latestVersion}`);
+    logIfVerbose(verbose, `✓ Successfully upgraded to version ${onPath.version}`);
     process.exit(0);
   } catch (error) {
     // Rethrow if this is a process.exit error from mocking

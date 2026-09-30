@@ -3,7 +3,8 @@ import { upgrade } from './upgrade.js';
 import * as versionUtils from '../utils/version.js';
 
 // Mock the version utilities
-vi.mock('../utils/version.js', () => ({
+vi.mock('../utils/version.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/version.js')>()),
   checkForUpdate: vi.fn(),
   upgradeFromGitHub: vi.fn(),
   detectPackageManager: vi.fn(),
@@ -113,6 +114,23 @@ describe('upgrade', () => {
     await expect(upgrade()).rejects.toThrow('process.exit(0)');
 
     expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'yarn', '0.7.0');
+  });
+
+  it('should succeed when the installed tsu is newer than the latest release', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+    vi.mocked(versionUtils.getTsuOnPath).mockReturnValue({
+      path: '/Users/me/Library/pnpm/bin/tsu',
+      version: '0.8.0',
+    });
+
+    await expect(upgrade({ verbose: true })).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('✓ Successfully upgraded to version 0.8.0');
   });
 
   it('should exit with code 1 when the tsu on PATH still reports the old version', async () => {
