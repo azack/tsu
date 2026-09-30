@@ -22,6 +22,7 @@ export {
   getFilesToPushWithStatus,
   isCodeownersRelevant,
   getCurrentBranch,
+  resolveBaseRef,
   getStagedDiff,
   getBranchDiff,
   isMainBranch,

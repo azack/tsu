@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { isGitRepo } from '../repo/is-git-repo.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 import { parseNameStatus } from './changed-file-entry.js';
 import type { ChangedFileEntry } from './changed-file-entry.js';
 import type { GetChangedFilesOptions } from './get-changed-files.js';
@@ -38,12 +39,8 @@ export function getChangedFilesWithStatus(
         break;
 
       case 'committed': {
-        try {
-          execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-            cwd: resolvedCwd,
-            stdio: 'pipe',
-          });
-        } catch {
+        const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+        if (!baseRef) {
           return [];
         }
 
@@ -57,7 +54,7 @@ export function getChangedFilesWithStatus(
           return [];
         }
 
-        command = `git diff --name-status --diff-filter=ACMR ${escapeShellArg(baseBranch)}...HEAD`;
+        command = `git diff --name-status --diff-filter=ACMR ${escapeShellArg(baseRef)}...HEAD`;
         break;
       }
     }

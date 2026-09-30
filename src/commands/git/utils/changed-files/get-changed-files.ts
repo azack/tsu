@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { isGitRepo } from '../repo/is-git-repo.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 
 export type ChangeType = 'committed' | 'staged' | 'unstaged';
 
@@ -43,13 +44,9 @@ export function getChangedFiles(options: GetChangedFilesOptions = {}): string[] 
 
       case 'committed': {
         // Get committed changes compared to base branch
-        // First check if base branch exists
-        try {
-          execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-            cwd: resolvedCwd,
-            stdio: 'pipe',
-          });
-        } catch {
+        // First resolve the base ref (local or origin/, whichever is fresher)
+        const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+        if (!baseRef) {
           // Base branch doesn't exist, return empty array
           return [];
         }
@@ -67,7 +64,7 @@ export function getChangedFiles(options: GetChangedFilesOptions = {}): string[] 
         }
 
         // Compare current branch to base branch
-        command = `git diff --name-only ${escapeShellArg(baseBranch)}...HEAD`;
+        command = `git diff --name-only ${escapeShellArg(baseRef)}...HEAD`;
         break;
       }
     }

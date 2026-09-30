@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { getCurrentBranch } from '../repo/get-current-branch.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 import { getFilesInRange } from './get-files-in-range.js';
 import { getFilesInRangeWithStatus } from './get-files-in-range-with-status.js';
 import type { ChangedFileEntry } from '../changed-files/changed-file-entry.js';
@@ -41,19 +42,15 @@ export function getFilesToPushWithStatus(
       return [];
     }
 
-    try {
-      execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-        cwd: resolvedCwd,
-        stdio: 'pipe',
-      });
-    } catch {
+    const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+    if (!baseRef) {
       /* v8 ignore next -- @preserve */
       return [];
     }
 
     // Files unique to the feature branch (excludes files merged from base).
     const featureUniqueFiles = getFilesInRangeWithStatus({
-      range: `${baseBranch}...HEAD`,
+      range: `${baseRef}...HEAD`,
       cwd: resolvedCwd,
     });
 
