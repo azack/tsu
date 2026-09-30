@@ -199,11 +199,18 @@ describe('version utilities', () => {
       );
     });
 
-    it('should use the github: spec for pnpm and yarn', () => {
+    it('should pin pnpm and yarn to the release tag', () => {
       expect(buildUpgradeCommand('bestdan', 'tsu', 'pnpm', '0.29.0')).toBe(
-        'pnpm add -g github:bestdan/tsu'
+        'pnpm add -g github:bestdan/tsu#v0.29.0'
       );
       expect(buildUpgradeCommand('bestdan', 'tsu', 'yarn', '0.29.0')).toBe(
+        'yarn global add github:bestdan/tsu#v0.29.0'
+      );
+    });
+
+    it('should use the unpinned github: spec for pnpm and yarn without a version', () => {
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'pnpm')).toBe('pnpm add -g github:bestdan/tsu');
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'yarn')).toBe(
         'yarn global add github:bestdan/tsu'
       );
     });

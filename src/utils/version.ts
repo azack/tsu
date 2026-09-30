@@ -155,10 +155,11 @@ function isValidGitHubName(name: string): boolean {
 /**
  * Builds the global install command for a package manager.
  *
- * npm installs from the release tarball when a version is given, because
- * `npm install -g github:<owner>/<repo>` leaves the global package as a symlink into
- * npm's temporary git-clone directory (no working bin), and the next install fails
- * with ENOTDIR.
+ * When a version is given, every package manager installs that release's tag, so
+ * they all install the same code. npm installs the tag's tarball rather than a
+ * `github:` spec, because `npm install -g github:<owner>/<repo>` leaves the global
+ * package as a symlink into npm's temporary git-clone directory (no working bin), and
+ * the next install fails with ENOTDIR.
  *
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
@@ -189,12 +190,13 @@ export function buildUpgradeCommand(
   }
 
   const githubUrl = `github:${owner}/${repo}`;
+  const githubSpec = version ? `${githubUrl}#v${version}` : githubUrl;
 
   switch (packageManager) {
     case 'pnpm':
-      return `pnpm add -g ${githubUrl}`;
+      return `pnpm add -g ${githubSpec}`;
     case 'yarn':
-      return `yarn global add ${githubUrl}`;
+      return `yarn global add ${githubSpec}`;
     case 'npm':
     default:
       return version

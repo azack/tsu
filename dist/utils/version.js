@@ -100,11 +100,12 @@ export function buildUpgradeCommand(owner, repo, packageManager, version) {
         throw new Error(`Invalid version: "${version}". Must be in X.Y.Z format.`);
     }
     const githubUrl = `github:${owner}/${repo}`;
+    const githubSpec = version ? `${githubUrl}#v${version}` : githubUrl;
     switch (packageManager) {
         case 'pnpm':
-            return `pnpm add -g ${githubUrl}`;
+            return `pnpm add -g ${githubSpec}`;
         case 'yarn':
-            return `yarn global add ${githubUrl}`;
+            return `yarn global add ${githubSpec}`;
         case 'npm':
         default:
             return version
