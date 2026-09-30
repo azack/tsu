@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { parsePositiveInt } from './utils/parse-positive-int.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -200,12 +201,9 @@ dartDcm
     .command('analyze')
     .description('Run DCM analyze and output files with issues')
     .option('-v, --verbose', 'show detailed progress information')
-    .option('--timeout <ms>', 'timeout in milliseconds', '7000')
+    .option('--timeout <ms>', 'timeout in milliseconds', parsePositiveInt, 7000)
     .action((options) => {
-    dartDcmAnalyze({
-        verbose: options.verbose,
-        timeout: options.timeout ? parseInt(options.timeout, 10) : undefined,
-    });
+    dartDcmAnalyze(options);
 });
 const hook = program.command('hook').description('Git hook utilities for Dart');
 hook
@@ -265,13 +263,10 @@ hookDcm
     .option('-u, --unstaged', 'check unstaged changes only')
     .option('-a, --all', 'check all changes (committed, staged, and unstaged)')
     .option('-b, --base-branch <branch>', 'base branch to compare against', 'main')
-    .option('--timeout <ms>', 'timeout in milliseconds', String(DEFAULT_HOOK_DCM_TIMEOUT_MS))
+    .option('--timeout <ms>', 'timeout in milliseconds', parsePositiveInt, DEFAULT_HOOK_DCM_TIMEOUT_MS)
     .option('-v, --verbose', 'show human-readable status messages (output to stderr)')
     .action((options) => {
-    dartHookDcmAnalyzeCheck({
-        ...options,
-        timeout: options.timeout ? parseInt(options.timeout, 10) : undefined,
-    });
+    dartHookDcmAnalyzeCheck(options);
 });
 hook
     .command('graphql')
