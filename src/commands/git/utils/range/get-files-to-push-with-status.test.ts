@@ -207,6 +207,114 @@ describe('getFilesToPushWithStatus', () => {
       }
     });
 
+    it('checks local-only base commits but not upstream files when local main has diverged', () => {
+      const tempDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      try {
+        writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
+
+        writeFileSync(join(tempDir, 'local-only.txt'), 'unpushed on main');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "local only"', { cwd: tempDir, stdio: 'pipe' });
+        advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
+
+        execSync('git checkout -b feature', { cwd: tempDir, stdio: 'pipe' });
+        writeFileSync(join(tempDir, 'feature.txt'), 'feature');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "feature"', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git merge --no-edit origin/main', { cwd: tempDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({ cwd: tempDir, baseBranch: 'main' });
+        expect(result).toEqual([
+          { path: 'feature.txt', status: 'A' },
+          { path: 'local-only.txt', status: 'A' },
+        ]);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
+      }
+    });
+
+    it('excludes upstream files from a detached HEAD on top of origin/main', () => {
+      const tempDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      try {
+        writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git remote set-head origin main', { cwd: tempDir, stdio: 'pipe' });
+
+        advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
+
+        execSync('git checkout --detach origin/main', { cwd: tempDir, stdio: 'pipe' });
+        writeFileSync(join(tempDir, 'feature.txt'), 'feature');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "feature"', { cwd: tempDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({ cwd: tempDir, baseBranch: 'main' });
+        expect(result).toEqual([{ path: 'feature.txt', status: 'A' }]);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
+      }
+    });
+
+    it('checks branch files in a shallow clone whose stale main is outside the shallow history', () => {
+      const sourceDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      const cloneParent = realpathSync(mkdtempSync(join(tmpdir(), 'git-shallow-')));
+      const cloneDir = join(cloneParent, 'clone');
+      try {
+        for (const file of ['initial.txt', 'history1.txt', 'history2.txt', 'history3.txt']) {
+          writeFileSync(join(sourceDir, file), file);
+          execSync('git add .', { cwd: sourceDir, stdio: 'pipe' });
+          execSync(`git commit -m "${file}"`, { cwd: sourceDir, stdio: 'pipe' });
+        }
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: sourceDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: sourceDir, stdio: 'pipe' });
+
+        execSync(`git clone --depth 2 --branch main "file://${remoteDir}" "${cloneDir}"`, {
+          stdio: 'pipe',
+        });
+        execSync('git config user.email "test@test.com"', { cwd: cloneDir, stdio: 'pipe' });
+        execSync('git config user.name "Test User"', { cwd: cloneDir, stdio: 'pipe' });
+
+        for (const file of ['upstream1.txt', 'upstream2.txt', 'upstream3.txt']) {
+          writeFileSync(join(sourceDir, file), file);
+          execSync('git add .', { cwd: sourceDir, stdio: 'pipe' });
+          execSync(`git commit -m "${file}"`, { cwd: sourceDir, stdio: 'pipe' });
+        }
+        execSync('git push origin main', { cwd: sourceDir, stdio: 'pipe' });
+
+        execSync('git fetch --depth 2 origin main', { cwd: cloneDir, stdio: 'pipe' });
+        execSync('git checkout --no-track -b feature origin/main', {
+          cwd: cloneDir,
+          stdio: 'pipe',
+        });
+        writeFileSync(join(cloneDir, 'feature.txt'), 'feature');
+        execSync('git add .', { cwd: cloneDir, stdio: 'pipe' });
+        execSync('git commit -m "feature"', { cwd: cloneDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({ cwd: cloneDir, baseBranch: 'main' });
+        expect(result).toEqual([{ path: 'feature.txt', status: 'A' }]);
+      } finally {
+        rmSync(sourceDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
+        rmSync(cloneParent, { recursive: true, force: true });
+      }
+    });
+
     it('excludes upstream files after merging origin/main into a pushed branch', () => {
       const tempDir = initRepo();
       const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));

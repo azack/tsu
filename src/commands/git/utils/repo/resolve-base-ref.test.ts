@@ -133,4 +133,15 @@ describe('resolveBaseRef', () => {
 
     expect(resolveBaseRef('origin/main', repoDir)).toBe('origin/main');
   });
+
+  it('should return origin when local main has diverged from origin', () => {
+    addRemote();
+    commitFile(repoDir, 'local-only.txt');
+    advanceOriginMain('upstream.txt');
+    git('checkout -b feature', repoDir);
+    commitFile(repoDir, 'feature.txt');
+    git('merge --no-edit origin/main', repoDir);
+
+    expect(resolveBaseRef('main', repoDir)).toBe('origin/main');
+  });
 });
