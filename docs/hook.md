@@ -26,7 +26,7 @@ By default, all hook commands check **files that would be pushed** (commits on y
 - `--all` - Check all changes (committed + staged + unstaged)
 - `--base-branch <branch>` - Compare against a custom base branch (default: `main`)
 
-If your local base branch is behind `origin/<branch>` (common with worktrees, where local `main` is rarely updated), hooks compare against `origin/<branch>` instead, so files from commits already merged upstream aren't re-checked. You don't need to run `git fetch origin main:main` first.
+If your local base branch is behind `origin/<branch>` (common with worktrees, where local `main` is rarely updated), hooks compare against whichever of `<branch>` and `origin/<branch>` your branch forked from more recently, so files from commits already merged upstream aren't re-checked. You don't need to run `git fetch origin main:main` first.
 
 **Examples:**
 ```bash
