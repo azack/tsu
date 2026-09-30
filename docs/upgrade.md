@@ -15,12 +15,12 @@ tsu upgrade [options]
 **Options:**
 
 - `-v, --verbose` - Show progress messages (output to stderr)
-- `-p, --package-manager <manager>` - Package manager to use: npm, pnpm, or yarn (default: npm)
+- `-p, --package-manager <manager>` - Package manager to use: npm, pnpm, or yarn (default: detected from where the installed `tsu` lives, else pnpm; when it falls back to pnpm, it says so on stderr even without `--verbose`)
 
 **Exit codes:**
 
 - `0` - Successfully upgraded or already on latest version
-- `1` - Failed to upgrade or error occurred
+- `1` - Failed to upgrade or error occurred, including when the install finished but the `tsu` on `PATH` still reports an older version (for example, another install shadows it)
 
 **Output:**
 
@@ -84,15 +84,18 @@ fi
 **Notes:**
 
 - The upgrade command uses the same package manager syntax as the initial installation
-- It installs from `github:bestdan/tsu` which always gets the latest code from the main branch
+- It installs the latest release's tag with every package manager: `github:bestdan/tsu#<tag>` for pnpm and yarn, and the tag's tarball for npm, because `npm install -g github:bestdan/tsu` leaves a broken symlink into npm's temporary clone directory
+- After installing, it runs `tsu --version` and fails if the `tsu` on `PATH` is missing or older than the latest release
 - Requires appropriate permissions to install global packages
 - If the upgrade fails, you can manually reinstall:
   ```bash
-  npm install -g github:bestdan/tsu
+  # Set TAG to the tag at https://github.com/bestdan/tsu/releases/latest
+  TAG=v0.29.0
+  npm install -g "https://codeload.github.com/bestdan/tsu/tar.gz/refs/tags/$TAG"
   # or
-  pnpm add -g github:bestdan/tsu
+  pnpm add -g "github:bestdan/tsu#$TAG"
   # or
-  yarn global add github:bestdan/tsu
+  yarn global add "github:bestdan/tsu#$TAG"
   ```
 
 ## Related Commands

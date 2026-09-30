@@ -1,7 +1,9 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildUpgradeCommand } from './build-upgrade-command.js';
+import { packageManagerFromPaths } from './package-manager-from-paths.js';
 
 /**
  * Get the current installed version of tsu from package.json
@@ -23,12 +25,12 @@ export function getCurrentVersion(): string {
 }
 
 /**
- * Fetch the latest release version from GitHub
+ * Fetch the latest release's tag from GitHub, exactly as GitHub names it
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
- * @returns The latest version string (without 'v' prefix)
+ * @returns The tag name (e.g. 'v0.29.0')
  */
-export async function getLatestGitHubVersion(owner: string, repo: string): Promise<string> {
+async function getLatestGitHubTag(owner: string, repo: string): Promise<string> {
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
     const response = await fetch(url, {
@@ -43,13 +45,22 @@ export async function getLatestGitHubVersion(owner: string, repo: string): Promi
     }
 
     const data = (await response.json()) as { tag_name: string };
-    // Remove 'v' prefix if present
-    return data.tag_name.replace(/^v/, '');
+    return data.tag_name;
   } catch (error) {
     throw new Error(`Failed to fetch latest version from GitHub: ${error}`, {
       cause: error,
     });
   }
+}
+
+/**
+ * Fetch the latest release version from GitHub
+ * @param owner - GitHub repository owner
+ * @param repo - GitHub repository name
+ * @returns The latest version string (without 'v' prefix)
+ */
+export async function getLatestGitHubVersion(owner: string, repo: string): Promise<string> {
+  return (await getLatestGitHubTag(owner, repo)).replace(/^v/, '');
 }
 
 /**
@@ -77,7 +88,7 @@ export function compareVersions(current: string, latest: string): number {
  * Check if an update is available
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
- * @returns Object with update status and version information
+ * @returns Object with update status, version information, and the latest release's tag
  */
 export async function checkForUpdate(
   owner: string,
@@ -86,15 +97,18 @@ export async function checkForUpdate(
   updateAvailable: boolean;
   currentVersion: string;
   latestVersion: string;
+  latestTag: string;
 }> {
   const currentVersion = getCurrentVersion();
-  const latestVersion = await getLatestGitHubVersion(owner, repo);
+  const latestTag = await getLatestGitHubTag(owner, repo);
+  const latestVersion = latestTag.replace(/^v/, '');
   const comparison = compareVersions(currentVersion, latestVersion);
 
   return {
     updateAvailable: comparison < 0,
     currentVersion,
     latestVersion,
+    latestTag,
   };
 }
 
@@ -107,31 +121,16 @@ export function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | null {
   try {
     // Check which package manager has tsu installed
     const whichTsu = execSync('which tsu', { encoding: 'utf-8' }).trim();
-
-    if (whichTsu.includes('/Library/pnpm/') || whichTsu.includes('/.local/share/pnpm/')) {
-      return 'pnpm';
+    const paths = [whichTsu];
+    try {
+      paths.push(realpathSync(whichTsu));
+    } catch {
+      // Dangling symlink: fall back to the unresolved path
     }
-    if (whichTsu.includes('/.yarn/') || whichTsu.includes('/Yarn/')) {
-      return 'yarn';
-    }
-    if (whichTsu.includes('/lib/node_modules/') || whichTsu.includes('/.npm/')) {
-      return 'npm';
-    }
-
-    return null;
+    return packageManagerFromPaths(paths);
   } catch {
     return null;
   }
-}
-
-/**
- * Validates a GitHub owner or repo name.
- * GitHub names can contain alphanumeric characters, hyphens, and underscores.
- * They cannot start with a hyphen or contain shell metacharacters.
- */
-/* v8 ignore next -- @preserve */
-function isValidGitHubName(name: string): boolean {
-  return /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name);
 }
 
 /**
@@ -139,43 +138,19 @@ function isValidGitHubName(name: string): boolean {
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
  * @param packageManager - Package manager to use (npm, pnpm, or yarn). If not provided, will try to detect, defaulting to pnpm.
- * @throws Error if owner or repo contain invalid characters
+ * @param tag - Release tag to install (e.g. 'v0.29.0'). npm needs it to install from the release tarball.
+ * @throws Error if owner, repo, or tag contain invalid characters
  */
 /* v8 ignore next -- @preserve */
 export function upgradeFromGitHub(
   owner: string,
   repo: string,
-  packageManager?: 'npm' | 'pnpm' | 'yarn'
+  packageManager?: 'npm' | 'pnpm' | 'yarn',
+  tag?: string
 ): void {
-  // Validate owner and repo to prevent command injection
-  if (!isValidGitHubName(owner)) {
-    throw new Error(
-      `Invalid GitHub owner: "${owner}". Must be alphanumeric with hyphens/underscores.`
-    );
-  }
-  if (!isValidGitHubName(repo)) {
-    throw new Error(
-      `Invalid GitHub repo: "${repo}". Must be alphanumeric with hyphens/underscores.`
-    );
-  }
-
   // Auto-detect package manager if not specified, defaulting to pnpm
   const pm = packageManager || detectPackageManager() || 'pnpm';
-  const githubUrl = `github:${owner}/${repo}`;
-
-  let command: string;
-  switch (pm) {
-    case 'pnpm':
-      command = `pnpm add -g ${githubUrl}`;
-      break;
-    case 'yarn':
-      command = `yarn global add ${githubUrl}`;
-      break;
-    case 'npm':
-    default:
-      command = `npm install -g ${githubUrl}`;
-      break;
-  }
+  const command = buildUpgradeCommand(owner, repo, pm, tag);
 
   try {
     execSync(command, { stdio: 'inherit' });

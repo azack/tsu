@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { upgrade } from './upgrade.js';
 import * as versionUtils from '../utils/version.js';
+import { getTsuOnPath } from '../utils/get-tsu-on-path.js';
 
 // Mock the version utilities
-vi.mock('../utils/version.js', () => ({
+vi.mock('../utils/version.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/version.js')>()),
   checkForUpdate: vi.fn(),
   upgradeFromGitHub: vi.fn(),
   detectPackageManager: vi.fn(),
 }));
+
+vi.mock('../utils/get-tsu-on-path.js', () => ({
+  getTsuOnPath: vi.fn(),
+}));
+
+const UNDETECTED_NOTE =
+  "Couldn't detect how tsu was installed; using pnpm. Pass -p npm|pnpm|yarn to override.";
 
 describe('upgrade', () => {
   let consoleErrorSpy: any;
@@ -20,6 +29,10 @@ describe('upgrade', () => {
     });
     // Mock detectPackageManager to return null so it falls back to pnpm default
     vi.mocked(versionUtils.detectPackageManager).mockReturnValue(null);
+    vi.mocked(getTsuOnPath).mockReturnValue({
+      path: '/usr/local/bin/tsu',
+      version: '0.7.0',
+    });
   });
 
   afterEach(() => {
@@ -31,12 +44,14 @@ describe('upgrade', () => {
       updateAvailable: false,
       currentVersion: '0.6.0',
       latestVersion: '0.6.0',
+      latestTag: 'v0.6.0',
     });
 
     await expect(upgrade()).rejects.toThrow('process.exit(0)');
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(versionUtils.upgradeFromGitHub).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
   });
 
   it('should call upgradeFromGitHub when update is available', async () => {
@@ -44,12 +59,13 @@ describe('upgrade', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
     vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
 
     await expect(upgrade()).rejects.toThrow('process.exit(0)');
 
-    expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'pnpm');
+    expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'pnpm', 'v0.7.0');
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -58,12 +74,13 @@ describe('upgrade', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
     vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
 
     await expect(upgrade({ packageManager: 'pnpm' })).rejects.toThrow('process.exit(0)');
 
-    expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'pnpm');
+    expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'pnpm', 'v0.7.0');
   });
 
   it('should show verbose output when verbose flag is enabled and up-to-date', async () => {
@@ -71,6 +88,7 @@ describe('upgrade', () => {
       updateAvailable: false,
       currentVersion: '0.6.0',
       latestVersion: '0.6.0',
+      latestTag: 'v0.6.0',
     });
 
     await expect(upgrade({ verbose: true })).rejects.toThrow('process.exit(0)');
@@ -84,6 +102,7 @@ describe('upgrade', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
     vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
 
@@ -94,6 +113,106 @@ describe('upgrade', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('✨ Latest version: 0.7.0');
     expect(consoleErrorSpy).toHaveBeenCalledWith('📥 Upgrading using pnpm...');
     expect(consoleErrorSpy).toHaveBeenCalledWith('✓ Successfully upgraded to version 0.7.0');
+  });
+
+  it('should use the detected package manager when none is specified', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.detectPackageManager).mockReturnValue('yarn');
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+
+    await expect(upgrade()).rejects.toThrow('process.exit(0)');
+
+    expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'yarn', 'v0.7.0');
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
+  });
+
+  it('should say it is assuming pnpm when the package manager cannot be detected', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+
+    await expect(upgrade()).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(UNDETECTED_NOTE);
+  });
+
+  it('should not print the detection note when a package manager is specified', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+
+    await expect(upgrade({ packageManager: 'pnpm' })).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
+  });
+
+  it('should succeed when the installed tsu is newer than the latest release', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+    vi.mocked(getTsuOnPath).mockReturnValue({
+      path: '/Users/me/Library/pnpm/bin/tsu',
+      version: '0.8.0',
+    });
+
+    await expect(upgrade({ verbose: true })).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('✓ Successfully upgraded to version 0.8.0');
+  });
+
+  it('should exit with code 1 when the tsu on PATH still reports the old version', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+    vi.mocked(getTsuOnPath).mockReturnValue({
+      path: '/Users/me/Library/pnpm/tsu',
+      version: '0.6.0',
+    });
+
+    await expect(upgrade()).rejects.toThrow('process.exit(1)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '❌ Installed 0.7.0 with pnpm, but the tsu on PATH (/Users/me/Library/pnpm/tsu) reports 0.6.0.'
+    );
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith('✓ Successfully upgraded to version 0.7.0');
+  });
+
+  it('should exit with code 1 when no tsu is on PATH after installing', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+    vi.mocked(getTsuOnPath).mockReturnValue({ path: null, version: null });
+
+    await expect(upgrade({ packageManager: 'npm' })).rejects.toThrow('process.exit(1)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '❌ Installed 0.7.0 with npm, but the tsu on PATH (not found) reports no version.'
+    );
   });
 
   it('should exit with code 1 on error', async () => {

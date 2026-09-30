@@ -29,6 +29,7 @@ describe('checkVersion', () => {
       updateAvailable: false,
       currentVersion: '0.6.0',
       latestVersion: '0.6.0',
+      latestTag: 'v0.6.0',
     });
 
     await expect(checkVersion()).rejects.toThrow('process.exit(0)');
@@ -44,6 +45,7 @@ describe('checkVersion', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
 
     await expect(checkVersion()).rejects.toThrow('process.exit(1)');
@@ -59,6 +61,7 @@ describe('checkVersion', () => {
       updateAvailable: false,
       currentVersion: '0.6.0',
       latestVersion: '0.6.0',
+      latestTag: 'v0.6.0',
     });
 
     await expect(checkVersion({ verbose: true })).rejects.toThrow('process.exit(0)');
@@ -72,6 +75,7 @@ describe('checkVersion', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
 
     await expect(checkVersion({ verbose: true })).rejects.toThrow('process.exit(1)');
@@ -107,6 +111,7 @@ describe('checkVersion', () => {
       updateAvailable: true,
       currentVersion: '0.6.0',
       latestVersion: '0.7.0',
+      latestTag: 'v0.7.0',
     });
 
     await expect(checkVersion()).rejects.toThrow('process.exit(1)');

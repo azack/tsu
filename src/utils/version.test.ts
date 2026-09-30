@@ -146,6 +146,7 @@ describe('version utilities', () => {
         updateAvailable: true,
         currentVersion: '0.6.0',
         latestVersion: '0.7.0',
+        latestTag: 'v0.7.0',
       });
     });
 
@@ -163,6 +164,7 @@ describe('version utilities', () => {
         updateAvailable: false,
         currentVersion: '0.6.0',
         latestVersion: '0.6.0',
+        latestTag: 'v0.6.0',
       });
     });
 
@@ -180,6 +182,25 @@ describe('version utilities', () => {
         updateAvailable: false,
         currentVersion: '0.7.0',
         latestVersion: '0.6.0',
+        latestTag: 'v0.6.0',
+      });
+    });
+
+    it('should keep a tag without a v prefix unchanged', async () => {
+      const fs = await import('node:fs');
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '0.6.0' }));
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ tag_name: '0.7.0' }),
+      });
+
+      const result = await checkForUpdate('bestdan', 'tsu');
+      expect(result).toEqual({
+        updateAvailable: true,
+        currentVersion: '0.6.0',
+        latestVersion: '0.7.0',
+        latestTag: '0.7.0',
       });
     });
   });
