@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: tag-version
+  cancel-in-progress: false
+
 jobs:
   create-tag:
     if: |
@@ -53,11 +57,23 @@ jobs:
         run: |
           TAG_NAME="v${{ steps.get_version.outputs.version }}"
           
-          # Check if tag already exists
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Error: Tag $TAG_NAME already exists"
+          # A tag at HEAD means an earlier run pushed it and a later step failed.
+          # Continue so the idempotent release step can retry.
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            TAG_SHA=$(git rev-parse "$TAG_NAME^{commit}")
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
+              echo "Tag $TAG_NAME already points at HEAD ($HEAD_SHA); skipping tag creation."
+              exit 0
+            fi
+            echo "Error: Tag $TAG_NAME already exists at $TAG_SHA, not HEAD ($HEAD_SHA)"
             exit 1
           fi
           
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/create-release.sh "v${{ steps.get_version.outputs.version }}" "${{ github.repository }}"
