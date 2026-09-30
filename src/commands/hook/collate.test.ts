@@ -3,6 +3,7 @@ import { hookCollate } from './collate.js';
 import * as gitUtils from '../git/utils/git.js';
 import * as dartUtils from '../dart/utils/dart.js';
 import { execSync, execFile } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import type { ChangedFileEntry } from '../git/utils/changed-files/changed-file-entry.js';
 
 // Mock child_process
@@ -79,7 +80,6 @@ describe('hookCollate', () => {
     mockIsGitRepo.mockReturnValue(true);
     mockIsDartPackage.mockReturnValue(true);
     mockGetChangedFiles.mockReturnValue([]);
-    mockExecSync.mockReturnValue(Buffer.from('/usr/bin/tsu'));
   });
 
   afterEach(() => {
@@ -426,6 +426,43 @@ Run \`dart fix --apply\` to fix some issues automatically.
 
     // graphql and codeowners (added file → codeowners relevant); dart hooks skipped
     expect(mockExecFile).toHaveBeenCalledTimes(2);
+    expect(mockExit).toHaveBeenCalledWith(0);
+
+    mockExit.mockRestore();
+  });
+
+  it("should run checks with this process's Node binary and CLI build, not a tsu on PATH", async () => {
+    setChangedFiles([{ path: 'lib/main.dart', status: 'M' }]);
+
+    const calls: { file: string; args: string[] }[] = [];
+    mockExecFile.mockImplementation(
+      (
+        file: string,
+        args: readonly string[] | null | undefined,
+        _options: any,
+        callback?: ((error: any, stdout: string, stderr: string) => void) | null
+      ) => {
+        calls.push({ file, args: [...((args as string[]) ?? [])] });
+        if (callback) {
+          callback(null, '', '');
+        }
+        return {} as any;
+      }
+    );
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+
+    await hookCollate({ verbose: false });
+
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      const [cliPath = '', subcommand] = call.args;
+      expect(call.file).toBe(process.execPath);
+      expect(isAbsolute(cliPath)).toBe(true);
+      expect(cliPath).toMatch(/[\\/]cli\.js$/);
+      expect(subcommand).toBe('hook');
+    }
+    expect(mockExecSync).not.toHaveBeenCalledWith('which tsu', expect.anything());
     expect(mockExit).toHaveBeenCalledWith(0);
 
     mockExit.mockRestore();
