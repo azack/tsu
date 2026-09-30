@@ -255,6 +255,15 @@ describe('version utilities', () => {
       ).toBe('yarn');
     });
 
+    it('should detect yarn from a prefix bin link resolved into ~/.config/yarn', () => {
+      expect(
+        packageManagerFromPaths([
+          '/opt/homebrew/bin/tsu',
+          '/Users/me/.config/yarn/global/node_modules/@bestdan/tsu/dist/cli.js',
+        ])
+      ).toBe('yarn');
+    });
+
     it('should return null for an unrecognized path', () => {
       expect(packageManagerFromPaths(['/usr/local/bin/tsu'])).toBeNull();
     });

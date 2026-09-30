@@ -63,7 +63,7 @@ export function packageManagerFromPaths(paths) {
     if (matches(['/Library/pnpm/', '/.local/share/pnpm/'])) {
         return 'pnpm';
     }
-    if (matches(['/.yarn/', '/Yarn/'])) {
+    if (matches(['/.yarn/', '/Yarn/', '/.config/yarn/'])) {
         return 'yarn';
     }
     if (matches(['/lib/node_modules/', '/.npm/'])) {
