@@ -79,32 +79,51 @@ export function detectPackageManager() {
 function isValidGitHubName(name) {
     return /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name);
 }
-export function upgradeFromGitHub(owner, repo, packageManager) {
+export function buildUpgradeCommand(owner, repo, packageManager, version) {
     if (!isValidGitHubName(owner)) {
         throw new Error(`Invalid GitHub owner: "${owner}". Must be alphanumeric with hyphens/underscores.`);
     }
     if (!isValidGitHubName(repo)) {
         throw new Error(`Invalid GitHub repo: "${repo}". Must be alphanumeric with hyphens/underscores.`);
     }
-    const pm = packageManager || detectPackageManager() || 'pnpm';
+    if (version !== undefined && !/^\d+\.\d+\.\d+$/.test(version)) {
+        throw new Error(`Invalid version: "${version}". Must be in X.Y.Z format.`);
+    }
     const githubUrl = `github:${owner}/${repo}`;
-    let command;
-    switch (pm) {
+    switch (packageManager) {
         case 'pnpm':
-            command = `pnpm add -g ${githubUrl}`;
-            break;
+            return `pnpm add -g ${githubUrl}`;
         case 'yarn':
-            command = `yarn global add ${githubUrl}`;
-            break;
+            return `yarn global add ${githubUrl}`;
         case 'npm':
         default:
-            command = `npm install -g ${githubUrl}`;
-            break;
+            return version
+                ? `npm install -g https://codeload.github.com/${owner}/${repo}/tar.gz/refs/tags/v${version}`
+                : `npm install -g ${githubUrl}`;
     }
+}
+export function upgradeFromGitHub(owner, repo, packageManager, version) {
+    const pm = packageManager || detectPackageManager() || 'pnpm';
+    const command = buildUpgradeCommand(owner, repo, pm, version);
     try {
         execSync(command, { stdio: 'inherit' });
     }
     catch (error) {
         throw new Error(`Failed to upgrade using ${pm}: ${error}`, { cause: error });
     }
+}
+export function getTsuOnPath() {
+    let path = null;
+    let version = null;
+    try {
+        path = execSync('which tsu', { encoding: 'utf-8', stdio: 'pipe' }).trim() || null;
+    }
+    catch {
+    }
+    try {
+        version = execSync('tsu --version', { encoding: 'utf-8', stdio: 'pipe' }).trim() || null;
+    }
+    catch {
+    }
+    return { path, version };
 }

@@ -135,19 +135,27 @@ function isValidGitHubName(name: string): boolean {
 }
 
 /**
- * Upgrade tsu by installing from GitHub
+ * Builds the global install command for a package manager.
+ *
+ * npm installs from the release tarball when a version is given, because
+ * `npm install -g github:<owner>/<repo>` leaves the global package as a symlink into
+ * npm's temporary git-clone directory (no working bin), and the next install fails
+ * with ENOTDIR.
+ *
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
- * @param packageManager - Package manager to use (npm, pnpm, or yarn). If not provided, will try to detect, defaulting to pnpm.
- * @throws Error if owner or repo contain invalid characters
+ * @param packageManager - Package manager to use
+ * @param version - Release version to install (e.g. '0.29.0'), without the `v` prefix
+ * @returns The shell command to run
+ * @throws Error if owner, repo, or version contain invalid characters
  */
-/* v8 ignore next -- @preserve */
-export function upgradeFromGitHub(
+export function buildUpgradeCommand(
   owner: string,
   repo: string,
-  packageManager?: 'npm' | 'pnpm' | 'yarn'
-): void {
-  // Validate owner and repo to prevent command injection
+  packageManager: 'npm' | 'pnpm' | 'yarn',
+  version?: string
+): string {
+  // Validate inputs to prevent command injection
   if (!isValidGitHubName(owner)) {
     throw new Error(
       `Invalid GitHub owner: "${owner}". Must be alphanumeric with hyphens/underscores.`
@@ -158,28 +166,68 @@ export function upgradeFromGitHub(
       `Invalid GitHub repo: "${repo}". Must be alphanumeric with hyphens/underscores.`
     );
   }
+  if (version !== undefined && !/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`Invalid version: "${version}". Must be in X.Y.Z format.`);
+  }
 
-  // Auto-detect package manager if not specified, defaulting to pnpm
-  const pm = packageManager || detectPackageManager() || 'pnpm';
   const githubUrl = `github:${owner}/${repo}`;
 
-  let command: string;
-  switch (pm) {
+  switch (packageManager) {
     case 'pnpm':
-      command = `pnpm add -g ${githubUrl}`;
-      break;
+      return `pnpm add -g ${githubUrl}`;
     case 'yarn':
-      command = `yarn global add ${githubUrl}`;
-      break;
+      return `yarn global add ${githubUrl}`;
     case 'npm':
     default:
-      command = `npm install -g ${githubUrl}`;
-      break;
+      return version
+        ? `npm install -g https://codeload.github.com/${owner}/${repo}/tar.gz/refs/tags/v${version}`
+        : `npm install -g ${githubUrl}`;
   }
+}
+
+/**
+ * Upgrade tsu by installing from GitHub
+ * @param owner - GitHub repository owner
+ * @param repo - GitHub repository name
+ * @param packageManager - Package manager to use (npm, pnpm, or yarn). If not provided, will try to detect, defaulting to pnpm.
+ * @param version - Release version to install. npm needs it to install from the release tarball.
+ * @throws Error if owner, repo, or version contain invalid characters
+ */
+/* v8 ignore next -- @preserve */
+export function upgradeFromGitHub(
+  owner: string,
+  repo: string,
+  packageManager?: 'npm' | 'pnpm' | 'yarn',
+  version?: string
+): void {
+  // Auto-detect package manager if not specified, defaulting to pnpm
+  const pm = packageManager || detectPackageManager() || 'pnpm';
+  const command = buildUpgradeCommand(owner, repo, pm, version);
 
   try {
     execSync(command, { stdio: 'inherit' });
   } catch (error) {
     throw new Error(`Failed to upgrade using ${pm}: ${error}`, { cause: error });
   }
+}
+
+/**
+ * Reports which `tsu` a new shell would run and the version it prints.
+ * @returns The resolved path and version, each null if it couldn't be determined
+ */
+/* v8 ignore next -- @preserve */
+export function getTsuOnPath(): { path: string | null; version: string | null } {
+  let path: string | null = null;
+  let version: string | null = null;
+  try {
+    path = execSync('which tsu', { encoding: 'utf-8', stdio: 'pipe' }).trim() || null;
+  } catch {
+    // tsu not on PATH
+  }
+  try {
+    version = execSync('tsu --version', { encoding: 'utf-8', stdio: 'pipe' }).trim() || null;
+  } catch {
+    // tsu not runnable
+  }
+  return { path, version };
 }

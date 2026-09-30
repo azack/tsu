@@ -67,7 +67,10 @@ program
   .command('upgrade')
   .description('Upgrade tsu to the latest version from GitHub')
   .option('-v, --verbose', 'show progress messages (output to stderr)')
-  .option('-p, --package-manager <manager>', 'package manager to use (npm, pnpm, or yarn)', 'npm')
+  .option(
+    '-p, --package-manager <manager>',
+    'package manager to use (npm, pnpm, or yarn; default: detected from the installed tsu, else pnpm)'
+  )
   .action(async (options: { verbose?: boolean; packageManager?: 'npm' | 'pnpm' | 'yarn' }) => {
     await upgrade(options);
   });

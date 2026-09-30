@@ -1,4 +1,9 @@
-import { checkForUpdate, upgradeFromGitHub, detectPackageManager } from '../utils/version.js';
+import {
+  checkForUpdate,
+  upgradeFromGitHub,
+  detectPackageManager,
+  getTsuOnPath,
+} from '../utils/version.js';
 import { logIfVerbose } from '../utils/logger.js';
 
 export interface UpgradeOptions {
@@ -38,7 +43,16 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
     logIfVerbose(verbose, `✨ Latest version: ${latestVersion}`);
     logIfVerbose(verbose, `📥 Upgrading using ${packageManager}...`);
 
-    upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager);
+    upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestVersion);
+
+    const onPath = getTsuOnPath();
+    if (onPath.version !== latestVersion) {
+      console.error(
+        `❌ Installed ${latestVersion} with ${packageManager}, but the tsu on PATH (${onPath.path ?? 'not found'}) reports ${onPath.version ?? 'no version'}.`
+      );
+      console.error('   Another install may be shadowing it. Check `which -a tsu`.');
+      process.exit(1);
+    }
 
     logIfVerbose(verbose, `✓ Successfully upgraded to version ${latestVersion}`);
     process.exit(0);

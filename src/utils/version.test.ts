@@ -4,6 +4,7 @@ import {
   getLatestGitHubVersion,
   compareVersions,
   checkForUpdate,
+  buildUpgradeCommand,
 } from './version.js';
 
 // Mock fs and child_process modules
@@ -181,6 +182,44 @@ describe('version utilities', () => {
         currentVersion: '0.7.0',
         latestVersion: '0.6.0',
       });
+    });
+  });
+
+  describe('buildUpgradeCommand', () => {
+    it('should install npm upgrades from the release tarball', () => {
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'npm', '0.29.0')).toBe(
+        'npm install -g https://codeload.github.com/bestdan/tsu/tar.gz/refs/tags/v0.29.0'
+      );
+    });
+
+    it('should fall back to the github: spec for npm without a version', () => {
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'npm')).toBe(
+        'npm install -g github:bestdan/tsu'
+      );
+    });
+
+    it('should use the github: spec for pnpm and yarn', () => {
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'pnpm', '0.29.0')).toBe(
+        'pnpm add -g github:bestdan/tsu'
+      );
+      expect(buildUpgradeCommand('bestdan', 'tsu', 'yarn', '0.29.0')).toBe(
+        'yarn global add github:bestdan/tsu'
+      );
+    });
+
+    it('should reject a version that is not X.Y.Z', () => {
+      expect(() => buildUpgradeCommand('bestdan', 'tsu', 'npm', '0.29.0; rm -rf ~')).toThrow(
+        'Invalid version'
+      );
+    });
+
+    it('should reject an invalid owner or repo', () => {
+      expect(() => buildUpgradeCommand('best dan', 'tsu', 'npm', '0.29.0')).toThrow(
+        'Invalid GitHub owner'
+      );
+      expect(() => buildUpgradeCommand('bestdan', 'tsu;ls', 'npm', '0.29.0')).toThrow(
+        'Invalid GitHub repo'
+      );
     });
   });
 });
