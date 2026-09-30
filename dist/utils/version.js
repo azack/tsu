@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export function getCurrentVersion() {
@@ -58,19 +58,29 @@ export async function checkForUpdate(owner, repo) {
         latestVersion,
     };
 }
+export function packageManagerFromPaths(paths) {
+    const matches = (needles) => paths.some((path) => needles.some((needle) => path.includes(needle)));
+    if (matches(['/Library/pnpm/', '/.local/share/pnpm/'])) {
+        return 'pnpm';
+    }
+    if (matches(['/.yarn/', '/Yarn/'])) {
+        return 'yarn';
+    }
+    if (matches(['/lib/node_modules/', '/.npm/'])) {
+        return 'npm';
+    }
+    return null;
+}
 export function detectPackageManager() {
     try {
         const whichTsu = execSync('which tsu', { encoding: 'utf-8' }).trim();
-        if (whichTsu.includes('/Library/pnpm/') || whichTsu.includes('/.local/share/pnpm/')) {
-            return 'pnpm';
+        const paths = [whichTsu];
+        try {
+            paths.push(realpathSync(whichTsu));
         }
-        if (whichTsu.includes('/.yarn/') || whichTsu.includes('/Yarn/')) {
-            return 'yarn';
+        catch {
         }
-        if (whichTsu.includes('/lib/node_modules/') || whichTsu.includes('/.npm/')) {
-            return 'npm';
-        }
-        return null;
+        return packageManagerFromPaths(paths);
     }
     catch {
         return null;

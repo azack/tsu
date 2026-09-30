@@ -6,6 +6,7 @@ export declare function checkForUpdate(owner: string, repo: string): Promise<{
     currentVersion: string;
     latestVersion: string;
 }>;
+export declare function packageManagerFromPaths(paths: string[]): 'npm' | 'pnpm' | 'yarn' | null;
 export declare function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | null;
 export declare function buildUpgradeCommand(owner: string, repo: string, packageManager: 'npm' | 'pnpm' | 'yarn', version?: string): string;
 export declare function upgradeFromGitHub(owner: string, repo: string, packageManager?: 'npm' | 'pnpm' | 'yarn', version?: string): void;

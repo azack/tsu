@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,6 +99,29 @@ export async function checkForUpdate(
 }
 
 /**
+ * Infers the package manager that owns a global `tsu` from its paths.
+ * @param paths - The `tsu` path on PATH and, when it's a symlink, its resolved target.
+ *   npm's global bin (e.g. `/usr/local/bin/tsu`) only reveals npm once resolved into
+ *   `lib/node_modules`, while yarn's `~/.yarn/bin` link resolves into `~/.config/yarn`.
+ * @returns The package manager, or null if no path matches
+ */
+export function packageManagerFromPaths(paths: string[]): 'npm' | 'pnpm' | 'yarn' | null {
+  const matches = (needles: string[]) =>
+    paths.some((path) => needles.some((needle) => path.includes(needle)));
+
+  if (matches(['/Library/pnpm/', '/.local/share/pnpm/'])) {
+    return 'pnpm';
+  }
+  if (matches(['/.yarn/', '/Yarn/'])) {
+    return 'yarn';
+  }
+  if (matches(['/lib/node_modules/', '/.npm/'])) {
+    return 'npm';
+  }
+  return null;
+}
+
+/**
  * Detect which package manager was used to install tsu globally
  * @returns The detected package manager or null if not found
  */
@@ -107,18 +130,13 @@ export function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | null {
   try {
     // Check which package manager has tsu installed
     const whichTsu = execSync('which tsu', { encoding: 'utf-8' }).trim();
-
-    if (whichTsu.includes('/Library/pnpm/') || whichTsu.includes('/.local/share/pnpm/')) {
-      return 'pnpm';
+    const paths = [whichTsu];
+    try {
+      paths.push(realpathSync(whichTsu));
+    } catch {
+      // Dangling symlink: fall back to the unresolved path
     }
-    if (whichTsu.includes('/.yarn/') || whichTsu.includes('/Yarn/')) {
-      return 'yarn';
-    }
-    if (whichTsu.includes('/lib/node_modules/') || whichTsu.includes('/.npm/')) {
-      return 'npm';
-    }
-
-    return null;
+    return packageManagerFromPaths(paths);
   } catch {
     return null;
   }

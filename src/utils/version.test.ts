@@ -5,6 +5,7 @@ import {
   compareVersions,
   checkForUpdate,
   buildUpgradeCommand,
+  packageManagerFromPaths,
 } from './version.js';
 
 // Mock fs and child_process modules
@@ -220,6 +221,35 @@ describe('version utilities', () => {
       expect(() => buildUpgradeCommand('bestdan', 'tsu;ls', 'npm', '0.29.0')).toThrow(
         'Invalid GitHub repo'
       );
+    });
+  });
+
+  describe('packageManagerFromPaths', () => {
+    it('should detect npm from a global bin symlink resolved into lib/node_modules', () => {
+      expect(
+        packageManagerFromPaths([
+          '/usr/local/bin/tsu',
+          '/usr/local/lib/node_modules/@bestdan/tsu/dist/cli.js',
+        ])
+      ).toBe('npm');
+    });
+
+    it('should detect pnpm from its global bin directory', () => {
+      expect(packageManagerFromPaths(['/Users/me/Library/pnpm/bin/tsu'])).toBe('pnpm');
+      expect(packageManagerFromPaths(['/home/me/.local/share/pnpm/tsu'])).toBe('pnpm');
+    });
+
+    it('should detect yarn from the unresolved ~/.yarn/bin link', () => {
+      expect(
+        packageManagerFromPaths([
+          '/Users/me/.yarn/bin/tsu',
+          '/Users/me/.config/yarn/global/node_modules/@bestdan/tsu/dist/cli.js',
+        ])
+      ).toBe('yarn');
+    });
+
+    it('should return null for an unrecognized path', () => {
+      expect(packageManagerFromPaths(['/usr/local/bin/tsu'])).toBeNull();
     });
   });
 });
