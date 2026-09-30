@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { getCurrentBranch } from '../repo/get-current-branch.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 import { getFilesInRange } from './get-files-in-range.js';
 
 export interface GetFilesToPushOptions {
@@ -56,13 +57,9 @@ export function getFilesToPush(options: GetFilesToPushOptions | string = {}): st
       return [];
     }
 
-    // Verify base branch exists
-    try {
-      execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-        cwd: resolvedCwd,
-        stdio: 'pipe',
-      });
-    } catch {
+    // Resolve the base ref (local or origin/, whichever is fresher)
+    const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+    if (!baseRef) {
       // Base branch doesn't exist, return empty array
       /* v8 ignore next -- @preserve */
       return [];
@@ -87,7 +84,7 @@ export function getFilesToPush(options: GetFilesToPushOptions | string = {}): st
 
       // Files unique to feature branch (excludes merged files from base branch)
       const featureUniqueFiles = getFilesInRange({
-        range: `${baseBranch}...HEAD`,
+        range: `${baseRef}...HEAD`,
         cwd: resolvedCwd,
       });
 
@@ -109,7 +106,7 @@ export function getFilesToPush(options: GetFilesToPushOptions | string = {}): st
 
     // No remote exists (first push) - use three-dot range against base branch
     // This shows only changes unique to HEAD, excluding merged files
-    const range = `${baseBranch}...HEAD`;
+    const range = `${baseRef}...HEAD`;
     return getFilesInRange({ range, cwd: resolvedCwd });
   } catch {
     /* v8 ignore next -- @preserve */

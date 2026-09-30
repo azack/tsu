@@ -14,6 +14,19 @@ function initRepo(): string {
   return tempDir;
 }
 
+function advanceOriginMain(cwd: string, files: string[]): void {
+  execSync('git checkout -b upstream-work origin/main', { cwd, stdio: 'pipe' });
+  for (const file of files) {
+    writeFileSync(join(cwd, file), file);
+    execSync('git add .', { cwd, stdio: 'pipe' });
+    execSync(`git commit -m "${file}"`, { cwd, stdio: 'pipe' });
+  }
+  execSync('git push origin upstream-work:main', { cwd, stdio: 'pipe' });
+  execSync('git checkout main', { cwd, stdio: 'pipe' });
+  execSync('git branch -D upstream-work', { cwd, stdio: 'pipe' });
+  execSync('git fetch origin', { cwd, stdio: 'pipe' });
+}
+
 describe('getFilesToPushWithStatus', () => {
   it('should return null for a non-git directory', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'not-git-'));
@@ -153,6 +166,78 @@ describe('getFilesToPushWithStatus', () => {
         rmSync(tempDir, { recursive: true, force: true });
         rmSync(remoteDir, { recursive: true, force: true });
         rmSync(worktreeParent, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('when local main is behind origin/main', () => {
+    it('excludes upstream files from a worktree branched off origin/main (first push)', () => {
+      const tempDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      const worktreeParent = realpathSync(mkdtempSync(join(tmpdir(), 'git-worktree-')));
+      const worktreeDir = join(worktreeParent, 'wt');
+      try {
+        writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
+
+        advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
+
+        execSync(`git worktree add --no-track -b feature "${worktreeDir}" origin/main`, {
+          cwd: tempDir,
+          stdio: 'pipe',
+        });
+        writeFileSync(join(worktreeDir, 'feature.txt'), 'feature');
+        execSync('git add .', { cwd: worktreeDir, stdio: 'pipe' });
+        execSync('git commit -m "feature"', { cwd: worktreeDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({
+          cwd: realpathSync(worktreeDir),
+          baseBranch: 'main',
+        });
+        expect(result).toEqual([{ path: 'feature.txt', status: 'A' }]);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
+        rmSync(worktreeParent, { recursive: true, force: true });
+      }
+    });
+
+    it('excludes upstream files after merging origin/main into a pushed branch', () => {
+      const tempDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      try {
+        writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git checkout -b feature', { cwd: tempDir, stdio: 'pipe' });
+        writeFileSync(join(tempDir, 'feature1.txt'), 'work 1');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "work 1"', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin feature', { cwd: tempDir, stdio: 'pipe' });
+
+        advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
+
+        execSync('git checkout feature', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git merge --no-edit origin/main', { cwd: tempDir, stdio: 'pipe' });
+        writeFileSync(join(tempDir, 'feature2.txt'), 'work 2');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "work 2"', { cwd: tempDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({ cwd: tempDir, baseBranch: 'main' });
+        expect(result).toEqual([{ path: 'feature2.txt', status: 'A' }]);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
       }
     });
   });
