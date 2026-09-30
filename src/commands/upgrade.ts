@@ -25,7 +25,8 @@ const GITHUB_REPO = 'tsu';
 /* v8 ignore next -- @preserve */
 export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
   const verbose = options.verbose || false;
-  const packageManager = options.packageManager || detectPackageManager() || 'pnpm';
+  const detected = options.packageManager ? null : detectPackageManager();
+  const packageManager = options.packageManager || detected || 'pnpm';
 
   logIfVerbose(verbose, '🔍 Checking for updates...');
 
@@ -43,6 +44,11 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
     logIfVerbose(verbose, `📦 Current version: ${currentVersion}`);
     logIfVerbose(verbose, `✨ Latest version: ${latestVersion}`);
     logIfVerbose(verbose, `📥 Upgrading using ${packageManager}...`);
+    if (!options.packageManager && !detected) {
+      console.error(
+        "Couldn't detect how tsu was installed; using pnpm. Pass -p npm|pnpm|yarn to override."
+      );
+    }
 
     upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestVersion);
 
@@ -51,7 +57,9 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
       console.error(
         `❌ Installed ${latestVersion} with ${packageManager}, but the tsu on PATH (${onPath.path ?? 'not found'}) reports ${onPath.version ?? 'no version'}.`
       );
-      console.error('   Another install may be shadowing it. Check `which -a tsu`.');
+      console.error(
+        '   Another install may be shadowing it. Check `which -a tsu`, and pass -p to upgrade with the package manager that owns it.'
+      );
       process.exit(1);
     }
 

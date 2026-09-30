@@ -15,7 +15,7 @@ tsu upgrade [options]
 **Options:**
 
 - `-v, --verbose` - Show progress messages (output to stderr)
-- `-p, --package-manager <manager>` - Package manager to use: npm, pnpm, or yarn (default: detected from where the installed `tsu` lives, else pnpm)
+- `-p, --package-manager <manager>` - Package manager to use: npm, pnpm, or yarn (default: detected from where the installed `tsu` lives, else pnpm; when it falls back to pnpm, it says so on stderr even without `--verbose`)
 
 **Exit codes:**
 

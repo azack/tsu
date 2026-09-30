@@ -11,6 +11,9 @@ vi.mock('../utils/version.js', async (importOriginal) => ({
   getTsuOnPath: vi.fn(),
 }));
 
+const UNDETECTED_NOTE =
+  "Couldn't detect how tsu was installed; using pnpm. Pass -p npm|pnpm|yarn to override.";
+
 describe('upgrade', () => {
   let consoleErrorSpy: any;
   let exitSpy: any;
@@ -43,6 +46,7 @@ describe('upgrade', () => {
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(versionUtils.upgradeFromGitHub).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
   });
 
   it('should call upgradeFromGitHub when update is available', async () => {
@@ -114,6 +118,33 @@ describe('upgrade', () => {
     await expect(upgrade()).rejects.toThrow('process.exit(0)');
 
     expect(versionUtils.upgradeFromGitHub).toHaveBeenCalledWith('bestdan', 'tsu', 'yarn', '0.7.0');
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
+  });
+
+  it('should say it is assuming pnpm when the package manager cannot be detected', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+
+    await expect(upgrade()).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(UNDETECTED_NOTE);
+  });
+
+  it('should not print the detection note when a package manager is specified', async () => {
+    vi.mocked(versionUtils.checkForUpdate).mockResolvedValue({
+      updateAvailable: true,
+      currentVersion: '0.6.0',
+      latestVersion: '0.7.0',
+    });
+    vi.mocked(versionUtils.upgradeFromGitHub).mockReturnValue(undefined);
+
+    await expect(upgrade({ packageManager: 'pnpm' })).rejects.toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(UNDETECTED_NOTE);
   });
 
   it('should succeed when the installed tsu is newer than the latest release', async () => {

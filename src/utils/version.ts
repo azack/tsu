@@ -232,7 +232,7 @@ export function upgradeFromGitHub(
 }
 
 /**
- * Reports which `tsu` a new shell would run and the version it prints.
+ * Reports which `tsu` is first on this process's PATH and the version it prints.
  * @returns The resolved path and version, each null if it couldn't be determined
  */
 /* v8 ignore next -- @preserve */
