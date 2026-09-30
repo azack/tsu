@@ -1,7 +1,8 @@
 import { execSync } from 'node:child_process';
-import { resolve, dirname } from 'node:path';
-import { findDartPackageRoot } from '../commands/dart/utils/dart.js';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { logIfVerbose } from './logger.js';
+import { escapeShellArg } from './shell.js';
 const DCM_VERSION_WARNING_PATTERN = /Installed\s+DCM\s+version\s+\([\d.]+\)\s+does\s+not\s+match\s+the\s+configured\s+constraint\s+[\d.]+\.?/;
 export function isDcmVersionWarning(output) {
     return DCM_VERSION_WARNING_PATTERN.test(output);
@@ -49,18 +50,25 @@ export function parseDcmAnalyzeOutput(jsonOutput) {
         return [];
     }
 }
-function runDcmForPackage(packageRoot, timeout) {
-    return execSync('dcm analyze . --fatal-style --fatal-warnings --no-congratulate --reporter=json', {
-        cwd: packageRoot,
+export class DcmTimeoutError extends Error {
+    constructor(cwd, timeout) {
+        super(`DCM analyze timed out in ${cwd} after ${timeout}ms`);
+        this.name = 'DcmTimeoutError';
+    }
+}
+function runDcm(cwd, timeout, files) {
+    const targets = files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
+    return execSync(`dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`, {
+        cwd,
         stdio: 'pipe',
         timeout,
         encoding: 'utf-8',
     });
 }
-function processDcmError(error, packageRoot, timeout) {
+function processDcmError(error, cwd, timeout) {
     const err = error;
-    if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
-        throw new Error(`DCM analyze timed out in ${packageRoot} after ${timeout}ms`);
+    if (err.code === 'ETIMEDOUT') {
+        throw new DcmTimeoutError(cwd, timeout);
     }
     const stdout = err.stdout?.toString() || '';
     const stderr = err.stderr?.toString() || '';
@@ -89,44 +97,25 @@ function processDcmError(error, packageRoot, timeout) {
         };
     }
     const errorMsg = stderr.length > 0 ? stderr : 'No output from DCM';
-    throw new Error(`DCM analyze failed in ${packageRoot}: ${errorMsg}`);
+    throw new Error(`DCM analyze failed in ${cwd}: ${errorMsg}`);
 }
-export function dcmAnalyze(options, dcmRunner = runDcmForPackage) {
+export function dcmAnalyze(options, dcmRunner = runDcm, fileExists = existsSync) {
     const { cwd, timeout = 7000, files } = options;
-    const packageRoots = new Set();
-    if (files && files.length > 0) {
-        for (const file of files) {
-            const absolutePath = resolve(cwd, file);
-            const packageRoot = findDartPackageRoot(dirname(absolutePath));
-            if (packageRoot) {
-                packageRoots.add(packageRoot);
-            }
-        }
+    const existingFiles = (files ?? []).filter((file) => fileExists(resolve(cwd, file)));
+    if (files && files.length > 0 && existingFiles.length === 0) {
+        return { success: true, filesWithIssues: [], rawOutput: '' };
     }
-    if (packageRoots.size === 0) {
-        packageRoots.add(cwd);
+    try {
+        const output = dcmRunner(cwd, timeout, existingFiles);
+        handleDcmVersionWarning(output);
+        return { success: true, filesWithIssues: [], rawOutput: output };
     }
-    let allSuccess = true;
-    const allFilesWithIssues = [];
-    let combinedOutput = '';
-    for (const packageRoot of packageRoots) {
-        try {
-            const output = dcmRunner(packageRoot, timeout);
-            combinedOutput += output;
-            handleDcmVersionWarning(output);
-        }
-        catch (error) {
-            const result = processDcmError(error, packageRoot, timeout);
-            if (!result.success) {
-                allSuccess = false;
-            }
-            combinedOutput += result.output;
-            allFilesWithIssues.push(...result.filesWithIssues);
-        }
+    catch (error) {
+        const result = processDcmError(error, cwd, timeout);
+        return {
+            success: result.success,
+            filesWithIssues: result.filesWithIssues,
+            rawOutput: result.output,
+        };
     }
-    return {
-        success: allSuccess,
-        filesWithIssues: allFilesWithIssues,
-        rawOutput: combinedOutput,
-    };
 }

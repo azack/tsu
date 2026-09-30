@@ -145,8 +145,10 @@ Runs DCM analyze on Dart files about to be pushed (excluding generated files) an
 1. Checks if DCM is installed, skips if not
 2. Gets Dart files about to be pushed (or based on `--staged`, `--unstaged`, `--all` options)
 3. Filters out generated files
-4. Runs `dcm analyze` on those files
-5. Exits with error if DCM analyze reports any issues
+4. Runs one `dcm analyze <files…>` from the current directory, which applies each file's own package `analysis_options.yaml` without analyzing whole packages
+5. Exits with error if DCM analyze reports any issues or fails to run
+
+If DCM does not finish within `--timeout <ms>` (default 20000), the check prints a warning and exits 0: a timeout says nothing about the code, so it does not block the push.
 
 **Requirements**: 
 - Must be run in a git repository

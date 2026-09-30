@@ -21,7 +21,10 @@ import { dartHookFormatCheck } from './commands/hook/format/check.js';
 import { dartHookAnalysisCheck } from './commands/hook/analysis/check.js';
 import { dartHookFixCheck } from './commands/hook/fix/check.js';
 import { dartHookDcmCheck } from './commands/hook/dcm/fix/check.js';
-import { dartHookDcmAnalyzeCheck } from './commands/hook/dcm/analyze/check.js';
+import {
+  dartHookDcmAnalyzeCheck,
+  DEFAULT_HOOK_DCM_TIMEOUT_MS,
+} from './commands/hook/dcm/analyze/check.js';
 import { dartHookGraphqlCheck } from './commands/hook/graphql/check.js';
 import { hookCollate } from './commands/hook/collate.js';
 import { dartFix } from './commands/dart/fix.js';
@@ -373,6 +376,7 @@ hookDcm
   .option('-u, --unstaged', 'check unstaged changes only')
   .option('-a, --all', 'check all changes (committed, staged, and unstaged)')
   .option('-b, --base-branch <branch>', 'base branch to compare against', 'main')
+  .option('--timeout <ms>', 'timeout in milliseconds', String(DEFAULT_HOOK_DCM_TIMEOUT_MS))
   .option('-v, --verbose', 'show human-readable status messages (output to stderr)')
   .action(
     (options: {
@@ -380,9 +384,13 @@ hookDcm
       unstaged?: boolean;
       all?: boolean;
       baseBranch?: string;
+      timeout?: string;
       verbose?: boolean;
     }) => {
-      dartHookDcmAnalyzeCheck(options);
+      dartHookDcmAnalyzeCheck({
+        ...options,
+        timeout: options.timeout ? parseInt(options.timeout, 10) : undefined,
+      });
     }
   );
 

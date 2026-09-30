@@ -1,10 +1,11 @@
-import { isGitRepo, getAllChangedFiles } from '../../../git/utils/git.js';
+import { isGitRepo, getAllChangedFiles, getGitRoot } from '../../../git/utils/git.js';
 import { isDartPackage, COMMON_DART_CODEGEN_SUFFIXES } from '../../../dart/utils/dart.js';
 import { filterFilesBySuffix } from '../../../files/utils/files.js';
 import { ensureCondition, ensureDCMInstalled, displayFileList, } from '../../../../utils/command-helpers.js';
 import { logIfVerbose } from '../../../../utils/logger.js';
-import { dcmAnalyze } from '../../../../utils/dcm-parse.js';
+import { dcmAnalyze, DcmTimeoutError } from '../../../../utils/dcm-parse.js';
 import { setVerbose } from '../../../../utils/verbose-state.js';
+export const DEFAULT_HOOK_DCM_TIMEOUT_MS = 20000;
 export function dartHookDcmAnalyzeCheck(options = {}) {
     const verbose = options.verbose || false;
     const excludeSuffixes = options.excludeSuffixes || [...COMMON_DART_CODEGEN_SUFFIXES];
@@ -26,7 +27,22 @@ export function dartHookDcmAnalyzeCheck(options = {}) {
         verbose,
         message: 'Running DCM analyze on',
     });
-    const result = dcmAnalyze({ cwd, timeout: 20000, files: modifiedFiles });
+    const timeout = options.timeout ?? DEFAULT_HOOK_DCM_TIMEOUT_MS;
+    let result;
+    try {
+        const runCwd = getGitRoot(cwd) ?? cwd;
+        result = dcmAnalyze({ cwd: runCwd, timeout, files: modifiedFiles });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof DcmTimeoutError) {
+            console.error(`⚠️  ${message}; skipping DCM analyze check.`);
+            console.error('Raise the limit with --timeout <ms>.');
+            process.exit(0);
+        }
+        console.error(`❌ Push blocked: ${message}`);
+        process.exit(1);
+    }
     if (!result.success) {
         const filesWithIssues = result.filesWithIssues;
         console.error('');

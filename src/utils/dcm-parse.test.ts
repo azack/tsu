@@ -8,6 +8,7 @@ import {
   isDcmVersionWarning,
   isOnlyDcmVersionWarning,
   handleDcmVersionWarning,
+  DcmTimeoutError,
 } from './dcm-parse.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -191,15 +192,17 @@ describe('dcmAnalyze', () => {
     );
   });
 
-  it('should throw error on SIGTERM', () => {
+  it('should treat an external SIGTERM as a failure, not a timeout', () => {
     const mockRunner = () => {
       const error: any = new Error('Terminated');
       error.signal = 'SIGTERM';
+      error.stdout = '';
+      error.stderr = '';
       throw error;
     };
 
     expect(() => dcmAnalyze({ cwd: '/test/pkg' }, mockRunner)).toThrow(
-      'DCM analyze timed out in /test/pkg after 7000ms'
+      'DCM analyze failed in /test/pkg: No output from DCM'
     );
   });
 
@@ -229,7 +232,7 @@ describe('dcmAnalyze', () => {
     );
   });
 
-  it('should use cwd when no files provided', () => {
+  it('should analyze cwd when no files provided', () => {
     const mockOutput = JSON.stringify({
       formatVersion: 11,
       timestamp: '2025-11-04 14:46:10.000',
@@ -238,8 +241,8 @@ describe('dcmAnalyze', () => {
     });
 
     let calledWith: string | undefined;
-    const mockRunner = (packageRoot: string) => {
-      calledWith = packageRoot;
+    const mockRunner = (runCwd: string) => {
+      calledWith = runCwd;
       return mockOutput;
     };
 
@@ -257,8 +260,8 @@ describe('dcmAnalyze', () => {
     });
 
     let calledWith: string | undefined;
-    const mockRunner = (packageRoot: string) => {
-      calledWith = packageRoot;
+    const mockRunner = (runCwd: string) => {
+      calledWith = runCwd;
       return mockOutput;
     };
 
@@ -267,67 +270,7 @@ describe('dcmAnalyze', () => {
     expect(calledWith).toBe('/test/package');
   });
 
-  it('should handle multiple package roots', () => {
-    const mockOutput1 = JSON.stringify({
-      formatVersion: 11,
-      timestamp: '2025-11-04 14:46:10.000',
-      summary: [],
-      analyzeResults: [{ path: 'lib/pkg1.dart', issues: [] }],
-    });
-
-    const mockOutput2 = JSON.stringify({
-      formatVersion: 11,
-      timestamp: '2025-11-04 14:46:10.000',
-      summary: [],
-      analyzeResults: [{ path: 'lib/pkg2.dart', issues: [] }],
-    });
-
-    const calledRoots: string[] = [];
-    const mockRunner = (packageRoot: string) => {
-      calledRoots.push(packageRoot);
-      return packageRoot.includes('pkg1') ? mockOutput1 : mockOutput2;
-    };
-
-    // This will try to find package roots but fall back to cwd
-    // In a real scenario with actual Dart packages, it would find multiple roots
-    const result = dcmAnalyze({ cwd: '/test/monorepo' }, mockRunner);
-
-    expect(result.success).toBe(true);
-    expect(calledRoots.length).toBeGreaterThan(0);
-  });
-
-  it('should combine output from multiple packages with issues', () => {
-    const mockOutput1 = JSON.stringify({
-      formatVersion: 11,
-      timestamp: '2025-11-04 14:46:10.000',
-      summary: [],
-      analyzeResults: [{ path: 'lib/file1.dart', issues: [{}] }],
-    });
-
-    const mockOutput2 = JSON.stringify({
-      formatVersion: 11,
-      timestamp: '2025-11-04 14:46:10.000',
-      summary: [],
-      analyzeResults: [{ path: 'lib/file2.dart', issues: [{}] }],
-    });
-
-    let callCount = 0;
-    const mockRunner = () => {
-      callCount++;
-      const error: any = new Error('Issues found');
-      error.stdout = callCount === 1 ? mockOutput1 : mockOutput2;
-      error.stderr = '';
-      throw error;
-    };
-
-    // Force it to run on cwd which will be treated as one package
-    const result = dcmAnalyze({ cwd: '/test' }, mockRunner);
-
-    expect(result.success).toBe(false);
-    expect(result.filesWithIssues).toContain('lib/file1.dart');
-  });
-
-  it('should find package roots for provided files', () => {
+  it('should pass changed files to a single DCM run from cwd', () => {
     const mockOutput = JSON.stringify({
       formatVersion: 11,
       timestamp: '2025-11-04 14:46:10.000',
@@ -335,19 +278,73 @@ describe('dcmAnalyze', () => {
       analyzeResults: [],
     });
 
-    const mockRunner = () => mockOutput;
+    const calls: Array<{ cwd: string; files: string[] }> = [];
+    const mockRunner = (cwd: string, _timeout: number, files: string[]) => {
+      calls.push({ cwd, files });
+      return mockOutput;
+    };
 
-    // Provide files - the function will try to find their package roots
-    // Since these aren't real files, it will fall back to cwd
     const result = dcmAnalyze(
       {
-        cwd: '/test/monorepo',
-        files: ['packages/app/lib/main.dart', 'packages/core/lib/config.dart'],
+        cwd: '/test/workspace',
+        files: ['script/tool.dart', 'packages/app/lib/main.dart', 'packages/core/lib/config.dart'],
       },
-      mockRunner
+      mockRunner,
+      () => true
     );
 
     expect(result.success).toBe(true);
+    expect(calls).toEqual([
+      {
+        cwd: '/test/workspace',
+        files: ['script/tool.dart', 'packages/app/lib/main.dart', 'packages/core/lib/config.dart'],
+      },
+    ]);
+  });
+
+  it('should skip files that no longer exist', () => {
+    let calledFiles: string[] | undefined;
+    const mockRunner = (_cwd: string, _timeout: number, files: string[]) => {
+      calledFiles = files;
+      return '';
+    };
+
+    dcmAnalyze(
+      { cwd: '/test/workspace', files: ['lib/kept.dart', 'lib/deleted.dart'] },
+      mockRunner,
+      (path) => path === '/test/workspace/lib/kept.dart'
+    );
+
+    expect(calledFiles).toEqual(['lib/kept.dart']);
+  });
+
+  it('should succeed without running DCM when every file was deleted', () => {
+    let called = false;
+    const mockRunner = () => {
+      called = true;
+      return '';
+    };
+
+    const result = dcmAnalyze(
+      { cwd: '/test/workspace', files: ['lib/deleted.dart'] },
+      mockRunner,
+      () => false
+    );
+
+    expect(called).toBe(false);
+    expect(result).toEqual({ success: true, filesWithIssues: [], rawOutput: '' });
+  });
+
+  it('should throw DcmTimeoutError on timeout', () => {
+    const mockRunner = () => {
+      const error: any = new Error('Timeout');
+      error.code = 'ETIMEDOUT';
+      throw error;
+    };
+
+    expect(() => dcmAnalyze({ cwd: '/test/pkg', timeout: 1234 }, mockRunner)).toThrow(
+      DcmTimeoutError
+    );
   });
 });
 

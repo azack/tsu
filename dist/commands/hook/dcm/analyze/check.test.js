@@ -139,4 +139,61 @@ describe('dartHookDcmAnalyzeCheck', () => {
         expect(processExitSpy).toHaveBeenCalledWith(1);
         dcmAnalyzeSpy.mockRestore();
     });
+    it('should pass a custom timeout to dcm analyze', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+        const dcmAnalyzeSpy = vi.spyOn(dcmParse, 'dcmAnalyze').mockReturnValue({
+            success: true,
+            filesWithIssues: [],
+        });
+        expect(() => {
+            dartHookDcmAnalyzeCheck({ timeout: 60000 });
+        }).toThrow('process.exit(0)');
+        expect(dcmAnalyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ timeout: 60000 }));
+        dcmAnalyzeSpy.mockRestore();
+    });
+    it('should warn without blocking when dcm analyze times out', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+        const dcmAnalyzeSpy = vi.spyOn(dcmParse, 'dcmAnalyze').mockImplementation(() => {
+            throw new dcmParse.DcmTimeoutError('/repo', 20000);
+        });
+        expect(() => {
+            dartHookDcmAnalyzeCheck({});
+        }).toThrow('process.exit(0)');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('⚠️  DCM analyze timed out in /repo after 20000ms; skipping DCM analyze check.');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Raise the limit with --timeout <ms>.');
+        dcmAnalyzeSpy.mockRestore();
+    });
+    it('should block with a message when dcm analyze fails to run', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+        const dcmAnalyzeSpy = vi.spyOn(dcmParse, 'dcmAnalyze').mockImplementation(() => {
+            throw new Error('DCM analyze failed in /repo: boom');
+        });
+        expect(() => {
+            dartHookDcmAnalyzeCheck({});
+        }).toThrow('process.exit(1)');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Push blocked: DCM analyze failed in /repo: boom');
+        dcmAnalyzeSpy.mockRestore();
+    });
+    it('should run dcm analyze from the repo root when invoked from a subdirectory', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['packages/app/lib/main.dart']);
+        const getGitRootSpy = vi.spyOn(gitUtils, 'getGitRoot').mockReturnValue('/repo');
+        const dcmAnalyzeSpy = vi.spyOn(dcmParse, 'dcmAnalyze').mockReturnValue({
+            success: true,
+            filesWithIssues: [],
+        });
+        expect(() => {
+            dartHookDcmAnalyzeCheck({});
+        }).toThrow('process.exit(0)');
+        expect(dcmAnalyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repo', files: ['packages/app/lib/main.dart'] }));
+        dcmAnalyzeSpy.mockRestore();
+        getGitRootSpy.mockRestore();
+    });
 });

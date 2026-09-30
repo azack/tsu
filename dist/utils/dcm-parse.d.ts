@@ -12,4 +12,7 @@ export interface CallAndParseDcmResult {
     filesWithIssues: string[];
     rawOutput?: string;
 }
-export declare function dcmAnalyze(options: CallAndParseDcmOptions, dcmRunner?: (packageRoot: string, timeout: number) => string): CallAndParseDcmResult;
+export declare class DcmTimeoutError extends Error {
+    constructor(cwd: string, timeout: number);
+}
+export declare function dcmAnalyze(options: CallAndParseDcmOptions, dcmRunner?: (cwd: string, timeout: number, files: string[]) => string, fileExists?: (path: string) => boolean): CallAndParseDcmResult;

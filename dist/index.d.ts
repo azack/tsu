@@ -12,7 +12,7 @@ export { dartHookDcmCheck, type DartHookDcmCheckOptions } from './commands/hook/
 export { dartHookDcmAnalyzeCheck, type DartHookDcmAnalyzeCheckOptions, } from './commands/hook/dcm/analyze/check.js';
 export { dartHookGraphqlCheck, type DartHookGraphqlCheckOptions, } from './commands/hook/graphql/check.js';
 export { dartFix, type DartFixOptions } from './commands/dart/fix.js';
-export { parseDcmAnalyzeOutput, dcmAnalyze, type CallAndParseDcmOptions, type CallAndParseDcmResult, } from './utils/dcm-parse.js';
+export { parseDcmAnalyzeOutput, dcmAnalyze, DcmTimeoutError, type CallAndParseDcmOptions, type CallAndParseDcmResult, } from './utils/dcm-parse.js';
 export { dartDcmAnalyze, type DartDcmAnalyzeOptions } from './commands/dart/dcm/analyze.js';
 export { checkExternals, type CheckExternalsOptions } from './commands/check/externals.js';
 export { logError, getErrorLogPath, isErrorLoggingEnabled, sanitizeErrorMessage, createErrorContext, type ErrorLogConfig, type ErrorContext, } from './utils/error-logger.js';

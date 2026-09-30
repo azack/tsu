@@ -1,7 +1,8 @@
 import { execSync } from 'node:child_process';
-import { resolve, dirname } from 'node:path';
-import { findDartPackageRoot } from '../commands/dart/utils/dart.js';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { logIfVerbose } from './logger.js';
+import { escapeShellArg } from './shell.js';
 
 interface DcmAnalyzeResult {
   path: string;
@@ -131,15 +132,29 @@ export interface CallAndParseDcmResult {
 }
 
 /**
- * Runs DCM analyze for a single package root.
+ * Thrown when DCM analyze does not finish within the timeout.
+ * A timeout says nothing about the code, so callers can report it differently from a failure.
+ */
+export class DcmTimeoutError extends Error {
+  constructor(cwd: string, timeout: number) {
+    super(`DCM analyze timed out in ${cwd} after ${timeout}ms`);
+    this.name = 'DcmTimeoutError';
+  }
+}
+
+/**
+ * Runs DCM analyze from cwd on the given files, or on the whole directory when none are given.
+ * DCM applies each file's own package analysis_options.yaml, so one call covers files from
+ * several packages without analyzing those packages in full.
  * Separated for easier testing and to avoid scattering v8 ignore comments.
  */
 /* v8 ignore next -- @preserve */
-function runDcmForPackage(packageRoot: string, timeout: number): string {
+function runDcm(cwd: string, timeout: number, files: string[]): string {
+  const targets = files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
   return execSync(
-    'dcm analyze . --fatal-style --fatal-warnings --no-congratulate --reporter=json',
+    `dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`,
     {
-      cwd: packageRoot,
+      cwd,
       stdio: 'pipe',
       timeout,
       encoding: 'utf-8',
@@ -158,7 +173,7 @@ interface DcmRunResult {
  * Distinguishes between timeout/execution errors and DCM finding issues.
  * Handles version mismatch warnings gracefully by logging them in verbose mode only.
  */
-function processDcmError(error: unknown, packageRoot: string, timeout: number): DcmRunResult {
+function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunResult {
   const err = error as {
     code?: string;
     signal?: string;
@@ -166,9 +181,9 @@ function processDcmError(error: unknown, packageRoot: string, timeout: number): 
     stderr?: Buffer | string;
   };
 
-  // Distinguish between timeout/execution errors and DCM finding issues
-  if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
-    throw new Error(`DCM analyze timed out in ${packageRoot} after ${timeout}ms`);
+  // Only execSync's own timeout sets ETIMEDOUT; a bare SIGTERM came from outside and must not pass the check
+  if (err.code === 'ETIMEDOUT') {
+    throw new DcmTimeoutError(cwd, timeout);
   }
 
   // If DCM ran but found issues, stdout will have the JSON report
@@ -212,59 +227,35 @@ function processDcmError(error: unknown, packageRoot: string, timeout: number): 
 
   // DCM failed to run properly - no output or real errors
   const errorMsg = stderr.length > 0 ? stderr : 'No output from DCM';
-  throw new Error(`DCM analyze failed in ${packageRoot}: ${errorMsg}`);
+  throw new Error(`DCM analyze failed in ${cwd}: ${errorMsg}`);
 }
 
 export function dcmAnalyze(
   options: CallAndParseDcmOptions,
   // Allow dependency injection for testing
-  dcmRunner: (packageRoot: string, timeout: number) => string = runDcmForPackage
+  dcmRunner: (cwd: string, timeout: number, files: string[]) => string = runDcm,
+  fileExists: (path: string) => boolean = existsSync
 ): CallAndParseDcmResult {
   const { cwd, timeout = 7000, files } = options;
 
-  // Find unique package roots for all the files
-  const packageRoots = new Set<string>();
+  // Deleted files show up in change lists but cannot be analyzed
+  const existingFiles = (files ?? []).filter((file) => fileExists(resolve(cwd, file)));
 
-  if (files && files.length > 0) {
-    for (const file of files) {
-      const absolutePath = resolve(cwd, file);
-      const packageRoot = findDartPackageRoot(dirname(absolutePath));
-      if (packageRoot) {
-        packageRoots.add(packageRoot);
-      }
-    }
+  if (files && files.length > 0 && existingFiles.length === 0) {
+    return { success: true, filesWithIssues: [], rawOutput: '' };
   }
 
-  if (packageRoots.size === 0) {
-    // No files provided or no package roots found, use cwd
-    packageRoots.add(cwd);
+  try {
+    const output = dcmRunner(cwd, timeout, existingFiles);
+    // Check for version warnings in successful runs too
+    handleDcmVersionWarning(output);
+    return { success: true, filesWithIssues: [], rawOutput: output };
+  } catch (error: unknown) {
+    const result = processDcmError(error, cwd, timeout);
+    return {
+      success: result.success,
+      filesWithIssues: result.filesWithIssues,
+      rawOutput: result.output,
+    };
   }
-
-  // Run DCM analyze on each package
-  let allSuccess = true;
-  const allFilesWithIssues: string[] = [];
-  let combinedOutput = '';
-
-  for (const packageRoot of packageRoots) {
-    try {
-      const output = dcmRunner(packageRoot, timeout);
-      combinedOutput += output;
-      // Check for version warnings in successful runs too
-      handleDcmVersionWarning(output);
-    } catch (error: unknown) {
-      const result = processDcmError(error, packageRoot, timeout);
-      // Only mark as failure if result indicates actual issues (not just version warning)
-      if (!result.success) {
-        allSuccess = false;
-      }
-      combinedOutput += result.output;
-      allFilesWithIssues.push(...result.filesWithIssues);
-    }
-  }
-
-  return {
-    success: allSuccess,
-    filesWithIssues: allFilesWithIssues,
-    rawOutput: combinedOutput,
-  };
 }

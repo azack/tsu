@@ -114,6 +114,7 @@ export { dartFix, type DartFixOptions } from './commands/dart/fix.js';
 export {
   parseDcmAnalyzeOutput,
   dcmAnalyze,
+  DcmTimeoutError,
   type CallAndParseDcmOptions,
   type CallAndParseDcmResult,
 } from './utils/dcm-parse.js';

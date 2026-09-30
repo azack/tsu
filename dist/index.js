@@ -11,7 +11,7 @@ export { dartHookDcmCheck } from './commands/hook/dcm/fix/check.js';
 export { dartHookDcmAnalyzeCheck, } from './commands/hook/dcm/analyze/check.js';
 export { dartHookGraphqlCheck, } from './commands/hook/graphql/check.js';
 export { dartFix } from './commands/dart/fix.js';
-export { parseDcmAnalyzeOutput, dcmAnalyze, } from './utils/dcm-parse.js';
+export { parseDcmAnalyzeOutput, dcmAnalyze, DcmTimeoutError, } from './utils/dcm-parse.js';
 export { dartDcmAnalyze } from './commands/dart/dcm/analyze.js';
 export { checkExternals } from './commands/check/externals.js';
 export { logError, getErrorLogPath, isErrorLoggingEnabled, sanitizeErrorMessage, createErrorContext, } from './utils/error-logger.js';
