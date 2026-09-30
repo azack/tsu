@@ -1,4 +1,4 @@
-import { execSync, execFile } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -162,17 +162,7 @@ export async function hookCollate(options = {}) {
             },
         };
     };
-    const getTsuCommand = () => {
-        try {
-            execSync('which tsu', { stdio: 'pipe' });
-            return { file: 'tsu', args: [] };
-        }
-        catch {
-            const cliPath = join(__dirname, '..', '..', 'cli.js');
-            return { file: 'node', args: [cliPath] };
-        }
-    };
-    const tsuCmd = getTsuCommand();
+    const tsuCmd = { file: process.execPath, args: [join(__dirname, '..', '..', 'cli.js')] };
     const hookTasks = [];
     if (runDartFormat) {
         hookTasks.push(createHookTask('dart format check', tsuCmd.file, [...tsuCmd.args, 'hook', 'format', 'check'], dartFiles.length === 0));

@@ -1,4 +1,4 @@
-import { execSync, execFile, ExecException } from 'node:child_process';
+import { execFile, ExecException } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -254,21 +254,10 @@ export async function hookCollate(options: HookCollateOptions = {}): Promise<voi
     };
   };
 
-  // Find the tsu binary path (either from node_modules or global)
-  const getTsuCommand = (): { file: string; args: string[] } => {
-    // Try to use the built version from this package first
-    try {
-      execSync('which tsu', { stdio: 'pipe' });
-      return { file: 'tsu', args: [] };
-    } catch {
-      // Fallback to node execution of the built CLI using absolute path
-      // __dirname is the dist/commands/hook directory, so we need to go up to dist
-      const cliPath = join(__dirname, '..', '..', 'cli.js');
-      return { file: 'node', args: [cliPath] };
-    }
-  };
-
-  const tsuCmd = getTsuCommand();
+  // Run each check with the same Node binary and CLI build as this process, so a
+  // different `tsu` on PATH can't run the checks with another version.
+  // __dirname is the dist/commands/hook directory, so we need to go up to dist
+  const tsuCmd = { file: process.execPath, args: [join(__dirname, '..', '..', 'cli.js')] };
 
   // Define context type for listr2 tasks
   type HookContext = { failures?: FailureDetail[] };
