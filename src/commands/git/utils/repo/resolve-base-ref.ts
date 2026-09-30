@@ -41,16 +41,21 @@ function isAncestor(ancestor: string, descendant: string, cwd: string): boolean 
  *
  * A local base branch is often behind `origin/<baseBranch>` (e.g. in worktree-heavy
  * setups where local `main` is rarely updated). Diffing against the stale local ref
- * pulls in every file from commits that already landed upstream. This picks whichever
- * of `<baseBranch>` and `origin/<baseBranch>` forks from HEAD most recently, so the
- * diff contains only changes unique to the current branch.
+ * pulls in every file from commits that already landed upstream.
+ *
+ * This compares the fork points `merge-base(<baseBranch>, HEAD)` and
+ * `merge-base(origin/<baseBranch>, HEAD)`, which are what the three-dot diff starts
+ * from. The local ref is kept when its fork point is the same as or newer than
+ * origin's; otherwise (origin's is newer, the two are unrelated, or only origin's can
+ * be computed) origin wins. The refs themselves are not compared, so a local-only
+ * commit on the base branch is excluded from the diff whenever the local ref wins.
  *
  * @param baseBranch - The base branch name. Defaults to 'main'
  * @param cwd - The directory to run git commands in. Defaults to process.cwd()
- * @returns `baseBranch` when it is at least as fresh as its remote counterpart (or no
- *   remote counterpart exists), `origin/<baseBranch>` when it is fresher, has diverged
- *   from the local branch, or the local branch doesn't exist, or null when neither
- *   ref exists
+ * @returns The ref to diff against: `baseBranch` or `origin/<baseBranch>` per the rule
+ *   above, `origin/<baseBranch>` when the local branch doesn't exist, `baseBranch`
+ *   when no remote counterpart exists or origin's fork point can't be computed, or null
+ *   when neither ref exists
  *
  * @example
  * // Local main is 40 commits behind origin/main, feature branched from origin/main
