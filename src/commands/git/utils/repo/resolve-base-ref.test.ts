@@ -144,4 +144,46 @@ describe('resolveBaseRef', () => {
 
     expect(resolveBaseRef('main', repoDir)).toBe('origin/main');
   });
+
+  it('should return the local branch when the branch forked from a diverged local main without merging origin', () => {
+    addRemote();
+    commitFile(repoDir, 'local-only.txt');
+    advanceOriginMain('upstream.txt');
+    git('checkout -b feature', repoDir);
+    commitFile(repoDir, 'feature.txt');
+
+    expect(resolveBaseRef('main', repoDir)).toBe('main');
+  });
+
+  it('should fall back to the local branch when neither ref shares history with HEAD', () => {
+    const cloneParent = realpathSync(mkdtempSync(join(tmpdir(), 'git-shallow-')));
+    const cloneDir = join(cloneParent, 'clone');
+    try {
+      addRemote();
+      git('checkout -b feature', repoDir);
+      commitFile(repoDir, 'feature.txt');
+      git('push -u origin feature', repoDir);
+
+      execSync(`git clone --depth 1 --branch feature "file://${remoteDir}" "${cloneDir}"`, {
+        stdio: 'pipe',
+      });
+      git('fetch --depth 1 origin main:main', cloneDir);
+
+      git('checkout main', repoDir);
+      commitFile(repoDir, 'upstream.txt');
+      git('push origin main', repoDir);
+      git('fetch --depth 1 origin main:refs/remotes/origin/main', cloneDir);
+      git('rev-parse --verify origin/main', cloneDir);
+
+      expect(execSync('git merge-base --all main HEAD || true', { cwd: cloneDir }).toString()).toBe(
+        ''
+      );
+      expect(
+        execSync('git merge-base --all origin/main HEAD || true', { cwd: cloneDir }).toString()
+      ).toBe('');
+      expect(resolveBaseRef('main', cloneDir)).toBe('main');
+    } finally {
+      rmSync(cloneParent, { recursive: true, force: true });
+    }
+  });
 });

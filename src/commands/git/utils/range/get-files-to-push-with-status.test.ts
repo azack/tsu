@@ -241,7 +241,7 @@ describe('getFilesToPushWithStatus', () => {
       }
     });
 
-    it('excludes upstream files from a detached HEAD on top of origin/main', () => {
+    it('excludes upstream files from a detached HEAD when origin/HEAD is set', () => {
       const tempDir = initRepo();
       const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
       try {
@@ -253,6 +253,33 @@ describe('getFilesToPushWithStatus', () => {
         execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
         execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
         execSync('git remote set-head origin main', { cwd: tempDir, stdio: 'pipe' });
+
+        advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
+
+        execSync('git checkout --detach origin/main', { cwd: tempDir, stdio: 'pipe' });
+        writeFileSync(join(tempDir, 'feature.txt'), 'feature');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "feature"', { cwd: tempDir, stdio: 'pipe' });
+
+        const result = getFilesToPushWithStatus({ cwd: tempDir, baseBranch: 'main' });
+        expect(result).toEqual([{ path: 'feature.txt', status: 'A' }]);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(remoteDir, { recursive: true, force: true });
+      }
+    });
+
+    it('excludes upstream files from a detached HEAD when origin/HEAD is not set', () => {
+      const tempDir = initRepo();
+      const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+      try {
+        writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+        execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+        execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+        execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+        execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+        execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
 
         advanceOriginMain(tempDir, ['upstream1.txt', 'upstream2.txt']);
 
