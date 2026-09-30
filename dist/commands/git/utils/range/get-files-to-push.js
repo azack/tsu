@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { getCurrentBranch } from '../repo/get-current-branch.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 import { getFilesInRange } from './get-files-in-range.js';
 export function getFilesToPush(options = {}) {
     const { cwd = process.cwd(), baseBranch = 'main' } = typeof options === 'string' ? { cwd: options } : options;
@@ -14,13 +15,8 @@ export function getFilesToPush(options = {}) {
         if (currentBranch === baseBranch) {
             return [];
         }
-        try {
-            execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-                cwd: resolvedCwd,
-                stdio: 'pipe',
-            });
-        }
-        catch {
+        const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+        if (!baseRef) {
             return [];
         }
         const remoteBranch = `origin/${currentBranch}`;
@@ -36,7 +32,7 @@ export function getFilesToPush(options = {}) {
         }
         if (hasRemote) {
             const featureUniqueFiles = getFilesInRange({
-                range: `${baseBranch}...HEAD`,
+                range: `${baseRef}...HEAD`,
                 cwd: resolvedCwd,
             });
             const unpushedFiles = getFilesInRange({
@@ -49,7 +45,7 @@ export function getFilesToPush(options = {}) {
             const featureUniqueSet = new Set(featureUniqueFiles);
             return unpushedFiles.filter((file) => featureUniqueSet.has(file));
         }
-        const range = `${baseBranch}...HEAD`;
+        const range = `${baseRef}...HEAD`;
         return getFilesInRange({ range, cwd: resolvedCwd });
     }
     catch {

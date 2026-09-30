@@ -1555,3 +1555,70 @@ describe('getFilesToPush with remote', () => {
 
 // Note: generateCommitMessage and generatePRDescription require Claude CLI
 // and are marked with v8 ignore comments for coverage exclusion
+
+describe('when local main is behind origin/main', () => {
+  function setupStaleMainRepo(): { tempDir: string; remoteDir: string } {
+    const tempDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-test-')));
+    const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+    const run = (command: string) => execSync(command, { cwd: tempDir, stdio: 'pipe' });
+    const commit = (file: string) => {
+      writeFileSync(join(tempDir, file), file);
+      run('git add .');
+      run(`git commit -m "${file}"`);
+    };
+
+    run('git init');
+    run('git config user.email "test@test.com"');
+    run('git config user.name "Test User"');
+    run('git checkout -b main');
+    commit('initial.txt');
+    execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+    run(`git remote add origin "${remoteDir}"`);
+    run('git push -u origin main');
+
+    run('git checkout -b upstream-work');
+    commit('upstream1.txt');
+    commit('upstream2.txt');
+    run('git push origin upstream-work:main');
+    run('git checkout --no-track -b feature origin/main');
+    run('git branch -D upstream-work');
+    commit('feature.txt');
+
+    return { tempDir, remoteDir };
+  }
+
+  it('getFilesToPush should exclude files that already landed on origin/main', () => {
+    const { tempDir, remoteDir } = setupStaleMainRepo();
+    try {
+      expect(getFilesToPush({ cwd: tempDir, baseBranch: 'main' })).toEqual(['feature.txt']);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+      rmSync(remoteDir, { recursive: true, force: true });
+    }
+  });
+
+  it('getChangedFiles should exclude files that already landed on origin/main', () => {
+    const { tempDir, remoteDir } = setupStaleMainRepo();
+    try {
+      expect(getChangedFiles({ type: 'committed', baseBranch: 'main', cwd: tempDir })).toEqual([
+        'feature.txt',
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+      rmSync(remoteDir, { recursive: true, force: true });
+    }
+  });
+
+  it('getBranchDiff should exclude changes that already landed on origin/main', () => {
+    const { tempDir, remoteDir } = setupStaleMainRepo();
+    try {
+      const diff = getBranchDiff('main', tempDir);
+      expect(diff).toContain('feature.txt');
+      expect(diff).not.toContain('upstream1.txt');
+      expect(diff).not.toContain('upstream2.txt');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+      rmSync(remoteDir, { recursive: true, force: true });
+    }
+  });
+});

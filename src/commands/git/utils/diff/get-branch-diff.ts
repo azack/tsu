@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { escapeShellArg } from '../../../../utils/shell.js';
 import { isGitRepo } from '../repo/is-git-repo.js';
+import { resolveBaseRef } from '../repo/resolve-base-ref.js';
 
 /**
  * Gets the diff between a base branch and HEAD.
@@ -17,17 +18,12 @@ export function getBranchDiff(baseBranch = 'main', cwd: string = process.cwd()):
 
     const resolvedCwd = resolve(cwd);
 
-    // Check if base branch exists
-    try {
-      execSync(`git rev-parse --verify ${escapeShellArg(baseBranch)}`, {
-        cwd: resolvedCwd,
-        stdio: 'pipe',
-      });
-    } catch {
+    const baseRef = resolveBaseRef(baseBranch, resolvedCwd);
+    if (!baseRef) {
       return null;
     }
 
-    const result = execSync(`git diff ${escapeShellArg(baseBranch)}...HEAD`, {
+    const result = execSync(`git diff ${escapeShellArg(baseRef)}...HEAD`, {
       cwd: resolvedCwd,
       stdio: 'pipe',
       encoding: 'utf-8',

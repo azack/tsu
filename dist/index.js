@@ -1,4 +1,4 @@
-export { isGitRepo, getGitRoot, getChangedFiles, getChangedFilesWithStatus, getAllChangedFiles, getAllChangedFilesWithStatus, getFilesInRange, getFilesInRangeWithStatus, getFilesToPush, getFilesToPushWithStatus, isCodeownersRelevant, getCurrentBranch, getStagedDiff, getBranchDiff, isMainBranch, callClaude, generateCommitMessage, generatePRDescription, createCommit, hasUnstagedChanges, } from './commands/git/utils/git.js';
+export { isGitRepo, getGitRoot, getChangedFiles, getChangedFilesWithStatus, getAllChangedFiles, getAllChangedFilesWithStatus, getFilesInRange, getFilesInRangeWithStatus, getFilesToPush, getFilesToPushWithStatus, isCodeownersRelevant, getCurrentBranch, resolveBaseRef, getStagedDiff, getBranchDiff, isMainBranch, callClaude, generateCommitMessage, generatePRDescription, createCommit, hasUnstagedChanges, } from './commands/git/utils/git.js';
 export { escapeShellArg, isCommandInstalled, isSafeShellInput, safeShellArg, } from './utils/shell.js';
 export { filterFilesBySuffix } from './commands/files/utils/files.js';
 export { setVerbose, isVerbose, resetVerbose } from './utils/verbose-state.js';

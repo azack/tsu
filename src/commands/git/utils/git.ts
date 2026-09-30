@@ -5,6 +5,7 @@ export { isGitRepo } from './repo/is-git-repo.js';
 export { getGitRoot } from './repo/get-git-root.js';
 export { getCurrentBranch } from './repo/get-current-branch.js';
 export { getRemoteBranch } from './repo/get-remote-branch.js';
+export { resolveBaseRef } from './repo/resolve-base-ref.js';
 
 // Changed files operations
 export {
