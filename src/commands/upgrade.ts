@@ -2,9 +2,9 @@ import {
   checkForUpdate,
   upgradeFromGitHub,
   detectPackageManager,
-  getTsuOnPath,
   compareVersions,
 } from '../utils/version.js';
+import { getTsuOnPath } from '../utils/get-tsu-on-path.js';
 import { logIfVerbose } from '../utils/logger.js';
 
 export interface UpgradeOptions {
@@ -31,7 +31,7 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
   logIfVerbose(verbose, '🔍 Checking for updates...');
 
   try {
-    const { updateAvailable, currentVersion, latestVersion } = await checkForUpdate(
+    const { updateAvailable, currentVersion, latestVersion, latestTag } = await checkForUpdate(
       GITHUB_OWNER,
       GITHUB_REPO
     );
@@ -50,7 +50,7 @@ export async function upgrade(options: UpgradeOptions = {}): Promise<void> {
       );
     }
 
-    upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestVersion);
+    upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestTag);
 
     const onPath = getTsuOnPath();
     if (!onPath.version || compareVersions(onPath.version, latestVersion) < 0) {

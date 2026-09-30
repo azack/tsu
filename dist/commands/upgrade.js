@@ -1,4 +1,5 @@
-import { checkForUpdate, upgradeFromGitHub, detectPackageManager, getTsuOnPath, compareVersions, } from '../utils/version.js';
+import { checkForUpdate, upgradeFromGitHub, detectPackageManager, compareVersions, } from '../utils/version.js';
+import { getTsuOnPath } from '../utils/get-tsu-on-path.js';
 import { logIfVerbose } from '../utils/logger.js';
 const GITHUB_OWNER = 'bestdan';
 const GITHUB_REPO = 'tsu';
@@ -8,7 +9,7 @@ export async function upgrade(options = {}) {
     const packageManager = options.packageManager || detected || 'pnpm';
     logIfVerbose(verbose, '🔍 Checking for updates...');
     try {
-        const { updateAvailable, currentVersion, latestVersion } = await checkForUpdate(GITHUB_OWNER, GITHUB_REPO);
+        const { updateAvailable, currentVersion, latestVersion, latestTag } = await checkForUpdate(GITHUB_OWNER, GITHUB_REPO);
         if (!updateAvailable) {
             logIfVerbose(verbose, `✓ Already on the latest version (${currentVersion})`);
             process.exit(0);
@@ -19,7 +20,7 @@ export async function upgrade(options = {}) {
         if (!options.packageManager && !detected) {
             console.error("Couldn't detect how tsu was installed; using pnpm. Pass -p npm|pnpm|yarn to override.");
         }
-        upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestVersion);
+        upgradeFromGitHub(GITHUB_OWNER, GITHUB_REPO, packageManager, latestTag);
         const onPath = getTsuOnPath();
         if (!onPath.version || compareVersions(onPath.version, latestVersion) < 0) {
             console.error(`❌ Installed ${latestVersion} with ${packageManager}, but the tsu on PATH (${onPath.path ?? 'not found'}) reports ${onPath.version ?? 'no version'}.`);
