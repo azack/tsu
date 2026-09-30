@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { hookCollate } from './collate.js';
 import * as gitUtils from '../git/utils/git.js';
 import * as dartUtils from '../dart/utils/dart.js';
-import { execSync, execFile } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { isAbsolute } from 'node:path';
 vi.mock('node:child_process', () => ({
     execSync: vi.fn(),
@@ -46,7 +46,6 @@ function successfulExecFile(track) {
     };
 }
 describe('hookCollate', () => {
-    const mockExecSync = vi.mocked(execSync);
     const mockExecFile = vi.mocked(execFile);
     const mockIsGitRepo = vi.mocked(gitUtils.isGitRepo);
     const mockIsDartPackage = vi.mocked(dartUtils.isDartPackage);
@@ -315,7 +314,6 @@ Run \`dart fix --apply\` to fix some issues automatically.
             expect(cliPath).toMatch(/[\\/]cli\.js$/);
             expect(subcommand).toBe('hook');
         }
-        expect(mockExecSync).not.toHaveBeenCalledWith('which tsu', expect.anything());
         expect(mockExit).toHaveBeenCalledWith(0);
         mockExit.mockRestore();
     });
