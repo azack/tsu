@@ -48,8 +48,9 @@ function isAncestor(ancestor: string, descendant: string, cwd: string): boolean 
  * @param baseBranch - The base branch name. Defaults to 'main'
  * @param cwd - The directory to run git commands in. Defaults to process.cwd()
  * @returns `baseBranch` when it is at least as fresh as its remote counterpart (or no
- *   remote counterpart exists), `origin/<baseBranch>` when it is fresher or the local
- *   branch doesn't exist, or null when neither ref exists
+ *   remote counterpart exists), `origin/<baseBranch>` when it is fresher, has diverged
+ *   from the local branch, or the local branch doesn't exist, or null when neither
+ *   ref exists
  *
  * @example
  * // Local main is 40 commits behind origin/main, feature branched from origin/main
@@ -78,13 +79,13 @@ export function resolveBaseRef(baseBranch = 'main', cwd: string = process.cwd())
     return baseBranch;
   }
 
-  if (!localForkPoint || isAncestor(localForkPoint, remoteForkPoint, resolvedCwd)) {
-    logIfVerbose(
-      undefined,
-      `Local ${baseBranch} is behind ${remoteRef}; comparing against ${remoteRef}`
-    );
-    return remoteRef;
+  if (localForkPoint && isAncestor(remoteForkPoint, localForkPoint, resolvedCwd)) {
+    return baseBranch;
   }
 
-  return baseBranch;
+  logIfVerbose(
+    undefined,
+    `Local ${baseBranch} is behind or has diverged from ${remoteRef}; comparing against ${remoteRef}`
+  );
+  return remoteRef;
 }

@@ -85,4 +85,39 @@ describe('getChangedFilesWithStatus', () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('should exclude committed files that already landed on origin/main when local main is behind', () => {
+    const tempDir = initRepo();
+    const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), 'git-remote-')));
+    try {
+      writeFileSync(join(tempDir, 'initial.txt'), 'initial');
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+      execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+      execSync('git init --bare', { cwd: remoteDir, stdio: 'pipe' });
+      execSync(`git remote add origin "${remoteDir}"`, { cwd: tempDir, stdio: 'pipe' });
+      execSync('git push -u origin main', { cwd: tempDir, stdio: 'pipe' });
+
+      execSync('git checkout -b upstream-work', { cwd: tempDir, stdio: 'pipe' });
+      writeFileSync(join(tempDir, 'upstream.txt'), 'upstream');
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+      execSync('git commit -m "upstream"', { cwd: tempDir, stdio: 'pipe' });
+      execSync('git push origin upstream-work:main', { cwd: tempDir, stdio: 'pipe' });
+
+      execSync('git checkout --no-track -b feature origin/main', { cwd: tempDir, stdio: 'pipe' });
+      writeFileSync(join(tempDir, 'feature.txt'), 'feature');
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' });
+      execSync('git commit -m "feature"', { cwd: tempDir, stdio: 'pipe' });
+
+      const result = getChangedFilesWithStatus({
+        cwd: tempDir,
+        type: 'committed',
+        baseBranch: 'main',
+      });
+      expect(result).toEqual([{ path: 'feature.txt', status: 'A' }]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+      rmSync(remoteDir, { recursive: true, force: true });
+    }
+  });
 });

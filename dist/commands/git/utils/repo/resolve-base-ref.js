@@ -49,9 +49,9 @@ export function resolveBaseRef(baseBranch = 'main', cwd = process.cwd()) {
     if (!remoteForkPoint || localForkPoint === remoteForkPoint) {
         return baseBranch;
     }
-    if (!localForkPoint || isAncestor(localForkPoint, remoteForkPoint, resolvedCwd)) {
-        logIfVerbose(undefined, `Local ${baseBranch} is behind ${remoteRef}; comparing against ${remoteRef}`);
-        return remoteRef;
+    if (localForkPoint && isAncestor(remoteForkPoint, localForkPoint, resolvedCwd)) {
+        return baseBranch;
     }
-    return baseBranch;
+    logIfVerbose(undefined, `Local ${baseBranch} is behind or has diverged from ${remoteRef}; comparing against ${remoteRef}`);
+    return remoteRef;
 }
