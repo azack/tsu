@@ -1,6 +1,6 @@
 {
   "name": "@bestdan/tsu",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "TypeScript command line utilities",
   "type": "module",
   "main": "./dist/index.js",
