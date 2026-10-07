@@ -132,6 +132,67 @@ describe('dartHookAnalysisCheck', () => {
     dartAnalyzeSpy.mockRestore();
   });
 
+  it('should pass a custom timeout to dart analyze', () => {
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+
+    const dartAnalyzeSpy = vi.spyOn(dartAnalyzeParse, 'dartAnalyze').mockReturnValue({
+      success: true,
+      filesWithIssues: [],
+      issues: [],
+    });
+
+    expect(() => {
+      dartHookAnalysisCheck({ timeout: 90000 });
+    }).toThrow('process.exit(0)');
+
+    expect(dartAnalyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ timeout: 90000 }));
+
+    dartAnalyzeSpy.mockRestore();
+  });
+
+  it('should warn without blocking when dart analyze times out', () => {
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+
+    const dartAnalyzeSpy = vi.spyOn(dartAnalyzeParse, 'dartAnalyze').mockImplementation(() => {
+      throw new dartAnalyzeParse.DartAnalyzeTimeoutError('/repo/features', 20000);
+    });
+
+    expect(() => {
+      dartHookAnalysisCheck({});
+    }).toThrow('process.exit(0)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '⚠️  dart analyze timed out in /repo/features after 20000ms; skipping dart analyze check.'
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Raise the limit with --timeout <ms>.');
+
+    dartAnalyzeSpy.mockRestore();
+  });
+
+  it('should block with a message when dart analyze fails to run', () => {
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+
+    const dartAnalyzeSpy = vi.spyOn(dartAnalyzeParse, 'dartAnalyze').mockImplementation(() => {
+      throw new Error('dart analyze failed in /repo/features: Could not find package');
+    });
+
+    expect(() => {
+      dartHookAnalysisCheck({});
+    }).toThrow('process.exit(1)');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '❌ Push blocked: dart analyze failed in /repo/features: Could not find package'
+    );
+
+    dartAnalyzeSpy.mockRestore();
+  });
+
   it('should display file list in verbose mode when analyzing files', () => {
     isGitRepoSpy.mockReturnValue(true);
     isDartPackageSpy.mockReturnValue(true);

@@ -7,14 +7,18 @@ import {
   displayFileList,
 } from '../../../utils/command-helpers.js';
 import { logIfVerbose } from '../../../utils/logger.js';
-import { dartAnalyze } from '../../../utils/dart-analyze-parse.js';
+import { dartAnalyze, DartAnalyzeTimeoutError } from '../../../utils/dart-analyze-parse.js';
 import type { ChangedFilesOptions } from '../../../types/command-options.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
 
 export interface DartHookAnalysisCheckOptions extends ChangedFilesOptions {
   /** Suffixes to exclude from analysis. Defaults to COMMON_DART_CODEGEN_SUFFIXES */
   excludeSuffixes?: string[];
+  /** Milliseconds to wait for each package's dart analyze. Defaults to DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS */
+  timeout?: number;
 }
+
+export const DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS = 20000;
 
 /**
  * Runs dart analyze on Dart files and checks for issues.
@@ -24,7 +28,8 @@ export interface DartHookAnalysisCheckOptions extends ChangedFilesOptions {
  * 1. Gets modified Dart files (excluding generated files)
  * 2. Maps files to their package roots
  * 3. Runs dart analyze on each unique package
- * 4. Exits with error if dart analyze reports any issues
+ * 4. Exits with error if dart analyze reports any issues or fails to run.
+ *    A timeout prints a warning and exits 0 instead, since it says nothing about the code.
  */
 export function dartHookAnalysisCheck(options: DartHookAnalysisCheckOptions = {}): void {
   const verbose = options.verbose || false;
@@ -65,8 +70,21 @@ export function dartHookAnalysisCheck(options: DartHookAnalysisCheckOptions = {}
     message: 'Running dart analyze on',
   });
 
-  // Run dart analyze on the files
-  const result = dartAnalyze({ cwd, timeout: 20000, files: modifiedFiles });
+  const timeout = options.timeout ?? DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS;
+
+  let result: ReturnType<typeof dartAnalyze>;
+  try {
+    result = dartAnalyze({ cwd, timeout, files: modifiedFiles });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof DartAnalyzeTimeoutError) {
+      console.error(`⚠️  ${message}; skipping dart analyze check.`);
+      console.error('Raise the limit with --timeout <ms>.');
+      process.exit(0);
+    }
+    console.error(`❌ Push blocked: ${message}`);
+    process.exit(1);
+  }
 
   if (!result.success) {
     const filesWithIssues = result.filesWithIssues;

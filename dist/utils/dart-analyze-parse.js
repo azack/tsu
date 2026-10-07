@@ -35,9 +35,18 @@ function runDartAnalyzeForPackage(packageRoot, timeout, files) {
         encoding: 'utf-8',
     });
 }
+export class DartAnalyzeTimeoutError extends Error {
+    constructor(packageRoot, timeout) {
+        super(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
+        this.name = 'DartAnalyzeTimeoutError';
+    }
+}
 function processDartAnalyzeError(error, packageRoot, timeout) {
     const err = error;
-    if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
+    if (err.code === 'ETIMEDOUT') {
+        throw new DartAnalyzeTimeoutError(packageRoot, timeout);
+    }
+    if (err.signal === 'SIGTERM') {
         throw new Error(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
     }
     const stdout = err.stdout?.toString() || '';

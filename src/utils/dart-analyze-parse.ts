@@ -77,6 +77,17 @@ function runDartAnalyzeForPackage(packageRoot: string, timeout: number, files?: 
   });
 }
 
+/**
+ * Thrown when dart analyze does not finish within the timeout.
+ * A timeout says nothing about the code, so callers can report it differently from a failure.
+ */
+export class DartAnalyzeTimeoutError extends Error {
+  constructor(packageRoot: string, timeout: number) {
+    super(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
+    this.name = 'DartAnalyzeTimeoutError';
+  }
+}
+
 interface DartAnalyzeRunResult {
   success: boolean;
   output: string;
@@ -99,8 +110,11 @@ function processDartAnalyzeError(
     stderr?: Buffer | string;
   };
 
-  // Distinguish between timeout/execution errors and dart analyze finding issues
-  if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
+  // Only execSync's own timeout sets ETIMEDOUT; a bare SIGTERM came from outside and must not pass the check
+  if (err.code === 'ETIMEDOUT') {
+    throw new DartAnalyzeTimeoutError(packageRoot, timeout);
+  }
+  if (err.signal === 'SIGTERM') {
     throw new Error(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
   }
 

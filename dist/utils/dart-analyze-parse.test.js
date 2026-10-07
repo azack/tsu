@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDartAnalyzeOutput, dartAnalyze } from './dart-analyze-parse.js';
+import { parseDartAnalyzeOutput, dartAnalyze, DartAnalyzeTimeoutError, } from './dart-analyze-parse.js';
 describe('parseDartAnalyzeOutput', () => {
     it('should parse single issue from dart analyze output', () => {
         const output = `Analyzing ....                         11.1s
@@ -163,7 +163,23 @@ describe('dartAnalyze', () => {
         };
         expect(() => {
             dartAnalyze({ cwd: '/test/path' }, mockRunner);
-        }).toThrow('dart analyze timed out');
+        }).toThrow(new DartAnalyzeTimeoutError('/test/path', 20000));
+    });
+    it('should not report an outside SIGTERM as a timeout', () => {
+        const mockRunner = () => {
+            const error = new Error('Terminated');
+            error.signal = 'SIGTERM';
+            throw error;
+        };
+        let thrown;
+        try {
+            dartAnalyze({ cwd: '/test/path' }, mockRunner);
+        }
+        catch (error) {
+            thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(Error);
+        expect(thrown).not.toBeInstanceOf(DartAnalyzeTimeoutError);
     });
     it('should throw error when dart analyze fails without output', () => {
         const mockRunner = () => {
