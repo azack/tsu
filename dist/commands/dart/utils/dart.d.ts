@@ -2,6 +2,7 @@ export { COMMON_DART_CODEGEN_SUFFIXES } from './package/constants.js';
 export { findDartPackageRoot } from './package/find-dart-package-root.js';
 export { findFilePackageRoot } from './package/find-file-package-root.js';
 export { isDartPackage } from './package/is-dart-package.js';
+export { findUnresolvedPackageRoots } from './package/find-unresolved-package-roots.js';
 export { extractImports } from './imports/extract-imports.js';
 export { resolveImportPath } from './imports/resolve-import-path.js';
 export { findAllDartFiles } from './files/find-all-dart-files.js';

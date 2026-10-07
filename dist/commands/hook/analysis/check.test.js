@@ -121,6 +121,26 @@ describe('dartHookAnalysisCheck', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith('  lib/main.dart');
         dartAnalyzeSpy.mockRestore();
     });
+    it('should block without running dart analyze when a package is unresolved', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['features/lib/main.dart']);
+        const getGitRootSpy = vi.spyOn(gitUtils, 'getGitRoot').mockReturnValue('/repo');
+        const unresolvedSpy = vi
+            .spyOn(dartUtils, 'findUnresolvedPackageRoots')
+            .mockReturnValue(['/repo/features']);
+        const dartAnalyzeSpy = vi.spyOn(dartAnalyzeParse, 'dartAnalyze');
+        expect(() => {
+            dartHookAnalysisCheck({});
+        }).toThrow('process.exit(1)');
+        expect(unresolvedSpy).toHaveBeenCalledWith(['features/lib/main.dart'], expect.any(String), '/repo');
+        expect(dartAnalyzeSpy).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('  features');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Run `flutter pub get` (or `dart pub get`), then push again.');
+        getGitRootSpy.mockRestore();
+        unresolvedSpy.mockRestore();
+        dartAnalyzeSpy.mockRestore();
+    });
     it('should exit with error when dart analyze finds issues', () => {
         isGitRepoSpy.mockReturnValue(true);
         isDartPackageSpy.mockReturnValue(true);

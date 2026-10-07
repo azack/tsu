@@ -6,6 +6,7 @@ export declare function ensureCondition(condition: boolean, errorMessage: string
     command?: string;
 }): void;
 export declare function ensureDartInstalled(verbose?: boolean): void;
+export declare function ensurePackagesResolved(files: string[], cwd: string, repoRoot: string, checkName: string): void;
 export declare function ensureDCMInstalled(verbose?: boolean): void;
 export declare function ensureClaudeInstalled(): void;
 export interface DisplayChangedFilesOptions extends ChangedFilesOptions {

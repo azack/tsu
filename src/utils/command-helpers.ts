@@ -4,6 +4,8 @@ import {
   getCurrentBranch,
   type ChangeType,
 } from '../commands/git/utils/git.js';
+import { relative } from 'node:path';
+import { findUnresolvedPackageRoots } from '../commands/dart/utils/dart.js';
 import type { ChangedFilesOptions } from '../types/command-options.js';
 import { isCommandInstalled } from './shell.js';
 import { isVerbose } from './verbose-state.js';
@@ -57,6 +59,37 @@ export function ensureDartInstalled(verbose?: boolean): void {
     verbose ? '⚠️  Warning: dart not installed, skipping' : '',
     { exitCode: 0 }
   );
+}
+
+/**
+ * Exits 1 when any of `files` (relative to `cwd`) belongs to a package whose dependencies
+ * aren't resolved inside `repoRoot`. Analysis there would fail on every import, or resolve
+ * them against a checkout above the repository.
+ * @param checkName - The tool named in the message, e.g. 'dart analyze'
+ * @example
+ * ensurePackagesResolved(modifiedFiles, cwd, getGitRoot(cwd) ?? cwd, 'dart analyze');
+ */
+export function ensurePackagesResolved(
+  files: string[],
+  cwd: string,
+  repoRoot: string,
+  checkName: string
+): void {
+  const unresolved = findUnresolvedPackageRoots(files, cwd, repoRoot);
+  if (unresolved.length === 0) {
+    return;
+  }
+
+  console.error('');
+  console.error(
+    `❌ Push blocked: ${checkName} can't check these packages, because their dependencies aren't resolved in this checkout:`
+  );
+  unresolved.forEach((packageRoot) => {
+    console.error(`  ${relative(repoRoot, packageRoot) || '.'}`);
+  });
+  console.error('');
+  console.error('Run `flutter pub get` (or `dart pub get`), then push again.');
+  process.exit(1);
 }
 
 /**

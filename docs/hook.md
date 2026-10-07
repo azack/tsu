@@ -84,6 +84,8 @@ Runs dart analyze on Dart files about to be pushed (excluding generated files) a
 - Must be run in a Dart package
 - Dart SDK must be installed. Get it from https://dart.dev
 
+Both analysis checks stop with exit 1 before analyzing when a changed file's package has no `.dart_tool/package_config.json` in it or above it inside the repository, and ask you to run `flutter pub get` (or `dart pub get`). Without that file, `dart analyze` and DCM fail on every import, or, in a checkout nested inside another, such as a linked worktree under the main checkout, quietly resolve imports against the outer checkout's code.
+
 **Example usage in git hooks:**
 ```bash
 # In .git/hooks/pre-push or lefthook.yml
@@ -154,6 +156,8 @@ If DCM does not finish within `--timeout <ms>` (default 20000), the check prints
 - Must be run in a git repository
 - Must be run in a Dart package
 - DCM is optional. Install from https://dcm.dev
+
+Like `hook analysis check`, it stops before analyzing when a changed file's package isn't resolved in this checkout.
 
 **Example usage in git hooks:**
 ```bash

@@ -4,6 +4,7 @@ import { filterFilesBySuffix } from '../../../files/utils/files.js';
 import {
   ensureCondition,
   ensureDCMInstalled,
+  ensurePackagesResolved,
   displayFileList,
 } from '../../../../utils/command-helpers.js';
 import { logIfVerbose } from '../../../../utils/logger.js';
@@ -72,11 +73,13 @@ export function dartHookDcmAnalyzeCheck(options: DartHookDcmAnalyzeCheckOptions 
   });
 
   const timeout = options.timeout ?? DEFAULT_HOOK_DCM_TIMEOUT_MS;
+  // Changed-file paths are relative to the repo root, so DCM must run from there
+  const runCwd = getGitRoot(cwd) ?? cwd;
+
+  ensurePackagesResolved(modifiedFiles, runCwd, runCwd, 'DCM analyze');
 
   let result: ReturnType<typeof dcmAnalyze>;
   try {
-    // Changed-file paths are relative to the repo root, so DCM must run from there
-    const runCwd = getGitRoot(cwd) ?? cwd;
     result = dcmAnalyze({ cwd: runCwd, timeout, files: modifiedFiles });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
