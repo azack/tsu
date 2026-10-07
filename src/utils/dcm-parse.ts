@@ -199,7 +199,10 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
   if (stdout.length > 0) {
     // DCM found issues (exit code non-zero but produced JSON output)
     const filesWithIssues = parseDcmAnalyzeOutput(stdout);
-    const excludedFiles = findDcmExcludedFiles(stdout, filesWithIssues, cwd);
+    // A DCM killed by a signal didn't finish, so its partial report is kept as is
+    const excludedFiles = err.signal
+      ? new Set<string>()
+      : findDcmExcludedFiles(stdout, filesWithIssues, cwd);
     const reportableFiles = filesWithIssues.filter((file) => !excludedFiles.has(file));
 
     if (excludedFiles.size > 0) {

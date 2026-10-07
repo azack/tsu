@@ -1,5 +1,9 @@
-const REGEXP_SPECIAL_CHARACTERS = new Set(['\\', '^', '$', '+', '.', '(', ')', '|', '[', ']']);
+const REGEXP_SPECIAL_CHARACTERS = new Set(['\\', '^', '$', '+', '.', '(', ')', '|']);
+const NEVER_MATCHES = /(?!)/;
 export function globToRegExp(glob) {
+    if (glob.includes('[') || glob.includes(']')) {
+        return NEVER_MATCHES;
+    }
     let source = '';
     let braceDepth = 0;
     for (let i = 0; i < glob.length; i++) {

@@ -24,6 +24,8 @@ describe('globToRegExp', () => {
     ['/repo/app/lib/?.dart', '/repo/app/lib/ab.dart'],
     ['/repo/app/lib/a.dart', '/repo/app/lib/aXdart'],
     ['/repo/app/lib/[a].dart', '/repo/app/lib/a.dart'],
+    ['/repo/app/lib/[a-z].dart', '/repo/app/lib/[a-z].dart'],
+    ['/repo/app/lib/[!a].dart', '/repo/app/lib/b.dart'],
   ])('should not match %s against %s', (glob, path) => {
     expect(globToRegExp(glob).test(path)).toBe(false);
   });

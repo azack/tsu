@@ -75,7 +75,9 @@ function processDcmError(error, cwd, timeout) {
     handleDcmVersionWarning(stdout);
     if (stdout.length > 0) {
         const filesWithIssues = parseDcmAnalyzeOutput(stdout);
-        const excludedFiles = findDcmExcludedFiles(stdout, filesWithIssues, cwd);
+        const excludedFiles = err.signal
+            ? new Set()
+            : findDcmExcludedFiles(stdout, filesWithIssues, cwd);
         const reportableFiles = filesWithIssues.filter((file) => !excludedFiles.has(file));
         if (excludedFiles.size > 0) {
             logIfVerbose(undefined, `Ignoring DCM findings in ${excludedFiles.size} file(s) their package's analysis_options.yaml excludes: ${[...excludedFiles].join(', ')}`);

@@ -1,11 +1,17 @@
-const REGEXP_SPECIAL_CHARACTERS = new Set(['\\', '^', '$', '+', '.', '(', ')', '|', '[', ']']);
+const REGEXP_SPECIAL_CHARACTERS = new Set(['\\', '^', '$', '+', '.', '(', ')', '|']);
+const NEVER_MATCHES = /(?!)/;
 
 /**
  * Converts a path glob, as written in analysis_options.yaml excludes, to an anchored RegExp.
  * Supports `*` (within one path segment), `**` (any number of segments), `?` and `{a,b}`.
- * Any other character, including `[` and `]`, matches itself.
+ * A glob with a character class (`[...]`) matches nothing, so callers that use it to drop
+ * findings keep them instead of guessing. Any other character matches itself.
  */
 export function globToRegExp(glob: string): RegExp {
+  if (glob.includes('[') || glob.includes(']')) {
+    return NEVER_MATCHES;
+  }
+
   let source = '';
   let braceDepth = 0;
 

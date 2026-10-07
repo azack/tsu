@@ -442,6 +442,18 @@ describe('dcmAnalyze with package excludes', () => {
         expect(result.success).toBe(false);
         expect(result.filesWithIssues).toEqual(['features/lib/menu.dart']);
     });
+    it('should fail when DCM was killed, even if every reported file is excluded', () => {
+        const runner = () => {
+            const error = new Error('Terminated');
+            error.signal = 'SIGTERM';
+            error.stdout = featuresConfig + report(['features/test/support/support.dart']);
+            error.stderr = '';
+            throw error;
+        };
+        const result = dcmAnalyze({ cwd: '/repo', files: ['features/test/support/support.dart'] }, runner, fileExists);
+        expect(result.success).toBe(false);
+        expect(result.filesWithIssues).toEqual(['features/test/support/support.dart']);
+    });
     it('should keep every finding when DCM printed no configs', () => {
         const result = dcmAnalyze({ cwd: '/repo', files: ['features/test/a_test.dart'] }, runnerFailingWith(report(['features/test/a_test.dart'])), fileExists);
         expect(result.success).toBe(false);
