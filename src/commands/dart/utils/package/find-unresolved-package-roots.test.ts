@@ -65,6 +65,13 @@ describe('findUnresolvedPackageRoots', () => {
     ]);
   });
 
+  it('should ignore a package above the repository', () => {
+    rmSync(join(repo, 'pubspec.yaml'));
+    write(join(outer, 'pubspec.yaml'));
+
+    expect(findUnresolvedPackageRoots(['docs/notes.dart'], repo, repo)).toEqual([]);
+  });
+
   it('should ignore files that belong to no package', () => {
     rmSync(join(repo, 'pubspec.yaml'));
 

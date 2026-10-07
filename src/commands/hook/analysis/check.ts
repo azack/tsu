@@ -65,7 +65,9 @@ export function dartHookAnalysisCheck(options: DartHookAnalysisCheckOptions = {}
     verbose,
     message: 'Running dart analyze on',
   });
-  ensurePackagesResolved(modifiedFiles, cwd, getGitRoot(cwd) ?? cwd, 'dart analyze');
+  // Changed-file paths are relative to the repo root, wherever the check runs from
+  const repoRoot = getGitRoot(cwd) ?? cwd;
+  ensurePackagesResolved(modifiedFiles, repoRoot, repoRoot, 'dart analyze');
 
   // Run dart analyze on the files
   const result = dartAnalyze({ cwd, timeout: 20000, files: modifiedFiles });

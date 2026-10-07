@@ -26,7 +26,8 @@ export function dartHookAnalysisCheck(options = {}) {
         verbose,
         message: 'Running dart analyze on',
     });
-    ensurePackagesResolved(modifiedFiles, cwd, getGitRoot(cwd) ?? cwd, 'dart analyze');
+    const repoRoot = getGitRoot(cwd) ?? cwd;
+    ensurePackagesResolved(modifiedFiles, repoRoot, repoRoot, 'dart analyze');
     const result = dartAnalyze({ cwd, timeout: 20000, files: modifiedFiles });
     if (!result.success) {
         const filesWithIssues = result.filesWithIssues;

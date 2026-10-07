@@ -170,11 +170,7 @@ describe('dartHookAnalysisCheck', () => {
       dartHookAnalysisCheck({});
     }).toThrow('process.exit(1)');
 
-    expect(unresolvedSpy).toHaveBeenCalledWith(
-      ['features/lib/main.dart'],
-      expect.any(String),
-      '/repo'
-    );
+    expect(unresolvedSpy).toHaveBeenCalledWith(['features/lib/main.dart'], '/repo', '/repo');
     expect(dartAnalyzeSpy).not.toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith('  features');
     expect(consoleErrorSpy).toHaveBeenCalledWith(

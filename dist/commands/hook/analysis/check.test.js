@@ -133,7 +133,7 @@ describe('dartHookAnalysisCheck', () => {
         expect(() => {
             dartHookAnalysisCheck({});
         }).toThrow('process.exit(1)');
-        expect(unresolvedSpy).toHaveBeenCalledWith(['features/lib/main.dart'], expect.any(String), '/repo');
+        expect(unresolvedSpy).toHaveBeenCalledWith(['features/lib/main.dart'], '/repo', '/repo');
         expect(dartAnalyzeSpy).not.toHaveBeenCalled();
         expect(consoleErrorSpy).toHaveBeenCalledWith('  features');
         expect(consoleErrorSpy).toHaveBeenCalledWith('Run `flutter pub get` (or `dart pub get`), then push again.');
