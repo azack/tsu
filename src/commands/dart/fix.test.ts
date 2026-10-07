@@ -124,6 +124,26 @@ describe('dartFix', () => {
     expect(processExitSpy).toHaveBeenCalledWith(0);
   });
 
+  it('should run dart fix on packages without the git repository variables a worktree hook exports', () => {
+    vi.stubEnv('GIT_DIR', '/repo/.git/worktrees/feature');
+    isCommandInstalledSpy.mockReturnValue(true);
+    findAffectedPackagesSpy.mockReturnValue(new Map([['packages/app', 'app']]));
+    existsSyncSpy.mockReturnValue(true);
+    vi.mocked(execSync).mockReturnValue('No issues found!');
+
+    expect(() => {
+      dartFix({ files: ['packages/app/lib/main.dart'], packages: true });
+    }).toThrow('process.exit(0)');
+
+    const fixCall = vi
+      .mocked(execSync)
+      .mock.calls.find(([command]) => String(command).startsWith('dart fix'));
+    expect(fixCall?.[1]?.env).toBeDefined();
+    expect(fixCall?.[1]?.env?.GIT_DIR).toBeUndefined();
+
+    vi.unstubAllEnvs();
+  });
+
   it.skip('should run dart fix with --apply when apply option is true', () => {
     // Skipping: File mode path has mocking issues, apply flag is tested in package mode
     isCommandInstalledSpy.mockReturnValue(true);

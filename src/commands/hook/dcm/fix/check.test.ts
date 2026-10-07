@@ -112,6 +112,27 @@ describe('dartHookDcmCheck', () => {
     expect(getAllChangedFilesSpy).toHaveBeenCalled();
   });
 
+  it('should run dcm fix without the git repository variables a worktree hook exports', () => {
+    vi.stubEnv('GIT_DIR', '/repo/.git/worktrees/feature');
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+    const hasUnstagedChangesSpy = vi.spyOn(gitUtils, 'hasUnstagedChanges').mockReturnValue(false);
+
+    expect(() => {
+      dartHookDcmCheck({});
+    }).toThrow('process.exit(0)');
+
+    const fixCall = vi
+      .mocked(execSync)
+      .mock.calls.find(([command]) => String(command).startsWith('dcm fix '));
+    expect(fixCall?.[1]?.env).toBeDefined();
+    expect(fixCall?.[1]?.env?.GIT_DIR).toBeUndefined();
+
+    hasUnstagedChangesSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
   it('should display file list in verbose mode when running dcm fix', () => {
     isGitRepoSpy.mockReturnValue(true);
     isDartPackageSpy.mockReturnValue(true);
