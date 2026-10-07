@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { findDcmExcludedFiles } from './find-dcm-excluded-files.js';
+import { splitJsonObjects } from './split-json-objects.js';
 import { logIfVerbose } from './logger.js';
 import { escapeShellArg } from './shell.js';
 const DCM_VERSION_WARNING_PATTERN = /Installed\s+DCM\s+version\s+\([\d.]+\)\s+does\s+not\s+match\s+the\s+configured\s+constraint\s+[\d.]+\.?/;
@@ -38,17 +40,13 @@ export function handleDcmVersionWarning(output) {
     }
 }
 export function parseDcmAnalyzeOutput(jsonOutput) {
-    try {
-        const jsonMatch = jsonOutput.match(/\{.*\}/s);
-        if (!jsonMatch) {
-            return [];
-        }
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.analyzeResults.map((result) => result.path);
-    }
-    catch {
-        return [];
-    }
+    const report = splitJsonObjects(jsonOutput).find(isDcmAnalyzeOutput);
+    return report ? report.analyzeResults.map((result) => result.path) : [];
+}
+function isDcmAnalyzeOutput(value) {
+    return (typeof value === 'object' &&
+        value !== null &&
+        Array.isArray(value.analyzeResults));
 }
 export class DcmTimeoutError extends Error {
     constructor(cwd, timeout) {
@@ -58,7 +56,8 @@ export class DcmTimeoutError extends Error {
 }
 function runDcm(cwd, timeout, files) {
     const targets = files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
-    return execSync(`dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`, {
+    const printConfig = files.length > 0 ? ' --print-config' : '';
+    return execSync(`dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json${printConfig}`, {
         cwd,
         stdio: 'pipe',
         timeout,
@@ -76,6 +75,18 @@ function processDcmError(error, cwd, timeout) {
     handleDcmVersionWarning(stdout);
     if (stdout.length > 0) {
         const filesWithIssues = parseDcmAnalyzeOutput(stdout);
+        const excludedFiles = findDcmExcludedFiles(stdout, filesWithIssues, cwd);
+        const reportableFiles = filesWithIssues.filter((file) => !excludedFiles.has(file));
+        if (excludedFiles.size > 0) {
+            logIfVerbose(undefined, `Ignoring DCM findings in ${excludedFiles.size} file(s) their package's analysis_options.yaml excludes: ${[...excludedFiles].join(', ')}`);
+        }
+        if (filesWithIssues.length > 0 && reportableFiles.length === 0) {
+            return {
+                success: true,
+                output: stdout,
+                filesWithIssues: [],
+            };
+        }
         if (filesWithIssues.length === 0 && isOnlyDcmVersionWarning(stderr)) {
             return {
                 success: true,
@@ -86,7 +97,7 @@ function processDcmError(error, cwd, timeout) {
         return {
             success: false,
             output: stdout,
-            filesWithIssues,
+            filesWithIssues: reportableFiles,
         };
     }
     if (stderr.length > 0 && isOnlyDcmVersionWarning(stderr)) {

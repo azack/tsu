@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { findDcmExcludedFiles } from './find-dcm-excluded-files.js';
+import { splitJsonObjects } from './split-json-objects.js';
 import { logIfVerbose } from './logger.js';
 import { escapeShellArg } from './shell.js';
 
@@ -104,19 +106,17 @@ export function handleDcmVersionWarning(output: string): void {
 }
 
 export function parseDcmAnalyzeOutput(jsonOutput: string): string[] {
-  try {
-    // DCM may output human-readable text before the JSON
-    // Try to find the JSON object in the output
-    const jsonMatch = jsonOutput.match(/\{.*\}/s);
-    if (!jsonMatch) {
-      return [];
-    }
+  // DCM prints human-readable text, and with --print-config each package's config, before the report
+  const report = splitJsonObjects(jsonOutput).find(isDcmAnalyzeOutput);
+  return report ? report.analyzeResults.map((result) => result.path) : [];
+}
 
-    const parsed: DcmAnalyzeOutput = JSON.parse(jsonMatch[0]);
-    return parsed.analyzeResults.map((result) => result.path);
-  } catch {
-    return [];
-  }
+function isDcmAnalyzeOutput(value: unknown): value is DcmAnalyzeOutput {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { analyzeResults?: unknown }).analyzeResults)
+  );
 }
 
 export interface CallAndParseDcmOptions {
@@ -144,15 +144,17 @@ export class DcmTimeoutError extends Error {
 
 /**
  * Runs DCM analyze from cwd on the given files, or on the whole directory when none are given.
- * DCM applies each file's own package analysis_options.yaml, so one call covers files from
- * several packages without analyzing those packages in full.
+ * DCM applies each file's own package analysis_options.yaml rules, so one call covers files from
+ * several packages without analyzing those packages in full. It skips that file's excludes,
+ * though, so named files get `--print-config` and processDcmError applies the excludes itself.
  * Separated for easier testing and to avoid scattering v8 ignore comments.
  */
 /* v8 ignore next -- @preserve */
 function runDcm(cwd: string, timeout: number, files: string[]): string {
   const targets = files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
+  const printConfig = files.length > 0 ? ' --print-config' : '';
   return execSync(
-    `dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`,
+    `dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json${printConfig}`,
     {
       cwd,
       stdio: 'pipe',
@@ -197,6 +199,23 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
   if (stdout.length > 0) {
     // DCM found issues (exit code non-zero but produced JSON output)
     const filesWithIssues = parseDcmAnalyzeOutput(stdout);
+    const excludedFiles = findDcmExcludedFiles(stdout, filesWithIssues, cwd);
+    const reportableFiles = filesWithIssues.filter((file) => !excludedFiles.has(file));
+
+    if (excludedFiles.size > 0) {
+      logIfVerbose(
+        undefined,
+        `Ignoring DCM findings in ${excludedFiles.size} file(s) their package's analysis_options.yaml excludes: ${[...excludedFiles].join(', ')}`
+      );
+    }
+
+    if (filesWithIssues.length > 0 && reportableFiles.length === 0) {
+      return {
+        success: true,
+        output: stdout,
+        filesWithIssues: [],
+      };
+    }
 
     // If there are no files with issues but stderr contains only version warning,
     // treat this as success
@@ -211,7 +230,7 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
     return {
       success: false,
       output: stdout,
-      filesWithIssues,
+      filesWithIssues: reportableFiles,
     };
   }
 

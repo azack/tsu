@@ -410,3 +410,41 @@ describe('dcmAnalyze with version warnings', () => {
         expect(result.filesWithIssues).toEqual([]);
     });
 });
+describe('dcmAnalyze with package excludes', () => {
+    const printedConfig = (packageRoot, globalExcludes) => `⚙️ Merged config:\n${JSON.stringify({
+        'analysis-options-path': `${packageRoot}/analysis_options.yaml`,
+        'global-excludes': globalExcludes,
+    }, null, 2)}\n`;
+    const report = (paths) => JSON.stringify({
+        formatVersion: 13,
+        summary: [],
+        analyzeResults: paths.map((path) => ({ path, issues: [{ id: 'arguments-ordering' }] })),
+    });
+    const runnerFailingWith = (stdout) => () => {
+        const error = new Error('DCM found issues');
+        error.stdout = stdout;
+        error.stderr = '✖ total lint style issues - 2';
+        throw error;
+    };
+    const featuresConfig = printedConfig('/repo/features', [
+        '/repo/features/**/*_test.dart',
+        '/repo/features/test/**',
+    ]);
+    const fileExists = () => true;
+    it('should pass when every finding is in a file its package excludes', () => {
+        const result = dcmAnalyze({ cwd: '/repo', files: ['features/test/support/support.dart', 'features/lib/menu.dart'] }, runnerFailingWith(featuresConfig +
+            report(['features/test/support/support.dart', 'features/test/tab_bar/menu_test.dart'])), fileExists);
+        expect(result.success).toBe(true);
+        expect(result.filesWithIssues).toEqual([]);
+    });
+    it('should report only the files their package does not exclude', () => {
+        const result = dcmAnalyze({ cwd: '/repo', files: ['features/test/support/support.dart', 'features/lib/menu.dart'] }, runnerFailingWith(featuresConfig + report(['features/test/support/support.dart', 'features/lib/menu.dart'])), fileExists);
+        expect(result.success).toBe(false);
+        expect(result.filesWithIssues).toEqual(['features/lib/menu.dart']);
+    });
+    it('should keep every finding when DCM printed no configs', () => {
+        const result = dcmAnalyze({ cwd: '/repo', files: ['features/test/a_test.dart'] }, runnerFailingWith(report(['features/test/a_test.dart'])), fileExists);
+        expect(result.success).toBe(false);
+        expect(result.filesWithIssues).toEqual(['features/test/a_test.dart']);
+    });
+});

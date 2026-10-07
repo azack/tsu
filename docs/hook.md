@@ -145,8 +145,9 @@ Runs DCM analyze on Dart files about to be pushed (excluding generated files) an
 1. Checks if DCM is installed, skips if not
 2. Gets Dart files about to be pushed (or based on `--staged`, `--unstaged`, `--all` options)
 3. Filters out generated files
-4. Runs one `dcm analyze <files…>` from the current directory, which applies each file's own package `analysis_options.yaml` without analyzing whole packages
-5. Exits with error if DCM analyze reports any issues or fails to run
+4. Runs one `dcm analyze <files…> --print-config` from the repository root, which applies each file's own package `analysis_options.yaml` rules without analyzing whole packages
+5. Ignores findings in files their package excludes through `analyzer: exclude` or `dart_code_metrics: rules-exclude`. DCM only applies those excludes when it scans a directory, so the check reads them from the configs `--print-config` prints. A package that excludes `test/**`, for example, isn't held to its rules in tests.
+6. Exits with error if DCM analyze reports any other issues or fails to run
 
 If DCM does not finish within `--timeout <ms>` (default 20000), the check prints a warning and exits 0: a timeout says nothing about the code, so it does not block the push.
 
