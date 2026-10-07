@@ -84,6 +84,7 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
     let allSuccess = true;
     const allIssues = [];
     let combinedOutput = '';
+    const timedOutPackageRoots = [];
     for (const [packageRoot, packageFiles] of packageToFiles.entries()) {
         const filesToAnalyze = packageFiles.length > 0 ? packageFiles : undefined;
         try {
@@ -91,11 +92,24 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
             combinedOutput += output;
         }
         catch (error) {
-            const result = processDartAnalyzeError(error, packageRoot, timeout);
+            let result;
+            try {
+                result = processDartAnalyzeError(error, packageRoot, timeout);
+            }
+            catch (processError) {
+                if (processError instanceof DartAnalyzeTimeoutError) {
+                    timedOutPackageRoots.push(packageRoot);
+                    continue;
+                }
+                throw processError;
+            }
             allSuccess = false;
             combinedOutput += result.output;
             allIssues.push(...result.issues);
         }
+    }
+    if (allSuccess && timedOutPackageRoots.length > 0) {
+        throw new DartAnalyzeTimeoutError(timedOutPackageRoots.join(', '), timeout);
     }
     const filesWithIssues = [...new Set(allIssues.map((issue) => issue.filePath))];
     return {
@@ -103,5 +117,6 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
         filesWithIssues,
         issues: allIssues,
         rawOutput: combinedOutput,
+        ...(timedOutPackageRoots.length > 0 ? { timedOutPackageRoots } : {}),
     };
 }

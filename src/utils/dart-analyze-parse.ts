@@ -59,6 +59,8 @@ export interface CallAndParseDartAnalyzeResult {
   filesWithIssues: string[];
   issues: DartAnalyzeIssue[];
   rawOutput?: string;
+  /** Package roots whose dart analyze timed out while another package reported issues */
+  timedOutPackageRoots?: string[];
 }
 
 /**
@@ -175,6 +177,7 @@ export function dartAnalyze(
   let allSuccess = true;
   const allIssues: DartAnalyzeIssue[] = [];
   let combinedOutput = '';
+  const timedOutPackageRoots: string[] = [];
 
   for (const [packageRoot, packageFiles] of packageToFiles.entries()) {
     const filesToAnalyze = packageFiles.length > 0 ? packageFiles : undefined;
@@ -183,11 +186,25 @@ export function dartAnalyze(
       const output = dartAnalyzeRunner(packageRoot, timeout, filesToAnalyze);
       combinedOutput += output;
     } catch (error: unknown) {
-      const result = processDartAnalyzeError(error, packageRoot, timeout);
+      let result: DartAnalyzeRunResult;
+      try {
+        result = processDartAnalyzeError(error, packageRoot, timeout);
+      } catch (processError: unknown) {
+        // Keep analyzing the other packages, so a timeout can't hide issues they report
+        if (processError instanceof DartAnalyzeTimeoutError) {
+          timedOutPackageRoots.push(packageRoot);
+          continue;
+        }
+        throw processError;
+      }
       allSuccess = false;
       combinedOutput += result.output;
       allIssues.push(...result.issues);
     }
+  }
+
+  if (allSuccess && timedOutPackageRoots.length > 0) {
+    throw new DartAnalyzeTimeoutError(timedOutPackageRoots.join(', '), timeout);
   }
 
   // Extract unique file paths with issues
@@ -198,5 +215,6 @@ export function dartAnalyze(
     filesWithIssues,
     issues: allIssues,
     rawOutput: combinedOutput,
+    ...(timedOutPackageRoots.length > 0 ? { timedOutPackageRoots } : {}),
   };
 }

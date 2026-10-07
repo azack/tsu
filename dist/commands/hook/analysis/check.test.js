@@ -119,6 +119,23 @@ describe('dartHookAnalysisCheck', () => {
         expect(dartAnalyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ timeout: 90000 }));
         dartAnalyzeSpy.mockRestore();
     });
+    it('should block on issues and name the packages that timed out', () => {
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['a/lib/a.dart', 'b/lib/b.dart']);
+        const dartAnalyzeSpy = vi.spyOn(dartAnalyzeParse, 'dartAnalyze').mockReturnValue({
+            success: false,
+            filesWithIssues: ['lib/a.dart'],
+            issues: [],
+            timedOutPackageRoots: ['/repo/b'],
+        });
+        expect(() => {
+            dartHookAnalysisCheck({});
+        }).toThrow('process.exit(1)');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('  lib/a.dart');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('dart analyze also timed out in /repo/b after 20000ms.');
+        dartAnalyzeSpy.mockRestore();
+    });
     it('should warn without blocking when dart analyze times out', () => {
         isGitRepoSpy.mockReturnValue(true);
         isDartPackageSpy.mockReturnValue(true);

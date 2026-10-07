@@ -94,6 +94,12 @@ export function dartHookAnalysisCheck(options: DartHookAnalysisCheckOptions = {}
     filesWithIssues.forEach((file) => {
       console.error(`  ${file}`);
     });
+    if (result.timedOutPackageRoots) {
+      console.error('');
+      console.error(
+        `dart analyze also timed out in ${result.timedOutPackageRoots.join(', ')} after ${timeout}ms.`
+      );
+    }
     console.error('');
     console.error('Run `dart fix --apply` to fix some issues automatically.');
     process.exit(1);

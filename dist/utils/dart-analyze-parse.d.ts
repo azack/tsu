@@ -17,6 +17,7 @@ export interface CallAndParseDartAnalyzeResult {
     filesWithIssues: string[];
     issues: DartAnalyzeIssue[];
     rawOutput?: string;
+    timedOutPackageRoots?: string[];
 }
 export declare class DartAnalyzeTimeoutError extends Error {
     constructor(packageRoot: string, timeout: number);
