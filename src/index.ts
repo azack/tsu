@@ -51,6 +51,10 @@ export {
   isSafeShellInput,
   safeShellArg,
 } from './utils/shell.js';
+export {
+  GIT_REPOSITORY_ENV_VARS,
+  withoutGitRepositoryEnv,
+} from './utils/without-git-repository-env.js';
 
 // File utilities
 export { filterFilesBySuffix } from './commands/files/utils/files.js';

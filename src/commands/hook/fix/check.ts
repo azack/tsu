@@ -11,6 +11,7 @@ import {
 import { logIfVerbose } from '../../../utils/logger.js';
 import type { ChangedFilesOptions } from '../../../types/command-options.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 
 export interface DartHookFixCheckOptions extends ChangedFilesOptions {
   /** Suffixes to exclude from fix. Defaults to COMMON_DART_CODEGEN_SUFFIXES */
@@ -74,6 +75,7 @@ export function dartHookFixCheck(options: DartHookFixCheckOptions = {}): void {
       const fileArg = escapeShellArg(file);
       execSync(`dart fix --apply ${fileArg}`, {
         cwd,
+        env: withoutGitRepositoryEnv(),
         stdio: 'pipe',
       });
     }

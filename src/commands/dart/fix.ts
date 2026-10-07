@@ -5,6 +5,7 @@ import { ensureCondition, ensureDartInstalled } from '../../utils/command-helper
 import { escapeShellArg } from '../../utils/shell.js';
 import { findAffectedPackages, readPackageName } from './utils/dart.js';
 import { logIfVerbose } from '../../utils/logger.js';
+import { withoutGitRepositoryEnv } from '../../utils/without-git-repository-env.js';
 
 export interface DartFixOptions {
   verbose?: boolean;
@@ -133,6 +134,7 @@ function runFixOnFiles(files: string[], cwd: string, verbose: boolean, apply: bo
     const fileArgs = files.map(escapeShellArg).join(' ');
     const result = execSync(`${command} ${fileArgs}`, {
       cwd,
+      env: withoutGitRepositoryEnv(),
       stdio: verbose ? 'pipe' : 'pipe',
       encoding: 'utf-8',
     });
@@ -193,6 +195,7 @@ function runFixOnPackages(
       const command = apply ? 'dart fix --apply' : 'dart fix --dry-run';
       const result = execSync(command, {
         cwd: packagePath,
+        env: withoutGitRepositoryEnv(),
         stdio: verbose ? 'pipe' : 'pipe',
         encoding: 'utf-8',
       });

@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve, dirname, relative } from 'node:path';
 import { findDartPackageRoot } from '../commands/dart/utils/dart.js';
 import { escapeShellArg } from './shell.js';
+import { withoutGitRepositoryEnv } from './without-git-repository-env.js';
 
 export interface DartAnalyzeIssue {
   severity: string;
@@ -71,6 +72,7 @@ function runDartAnalyzeForPackage(packageRoot: string, timeout: number, files?: 
 
   return execSync(`dart analyze ${fileArgs} --fatal-infos --fatal-warnings`, {
     cwd: packageRoot,
+    env: withoutGitRepositoryEnv(),
     stdio: 'pipe',
     timeout,
     encoding: 'utf-8',

@@ -11,6 +11,7 @@ import {
 } from '../../../utils/command-helpers.js';
 import type { ChangedFilesOptions } from '../../../types/command-options.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 
 export interface DartHookFormatCheckOptions extends ChangedFilesOptions {
   /** Suffixes to exclude from formatting. Defaults to COMMON_DART_CODEGEN_SUFFIXES */
@@ -72,6 +73,7 @@ export function dartHookFormatCheck(options: DartHookFormatCheckOptions = {}): v
     const fileArgs = modifiedFiles.map(escapeShellArg).join(' ');
     execSync(`dart format ${fileArgs}`, {
       cwd,
+      env: withoutGitRepositoryEnv(),
       stdio: 'pipe',
     });
   } catch (error) {

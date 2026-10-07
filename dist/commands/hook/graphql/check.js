@@ -5,6 +5,7 @@ import { ensureCondition, displayFileList } from '../../../utils/command-helpers
 import { isCommandInstalled } from '../../../utils/shell.js';
 import { logIfVerbose } from '../../../utils/logger.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 export async function dartHookGraphqlCheck(options = {}) {
     const verbose = options.verbose || false;
     const codegenCommands = ['melos run codegen:graphql', 'melos run codegen:graphql:test'];
@@ -29,6 +30,7 @@ export async function dartHookGraphqlCheck(options = {}) {
         for (const command of codegenCommands) {
             execSync(command, {
                 cwd,
+                env: withoutGitRepositoryEnv(),
                 stdio: verbose ? 'inherit' : 'pipe',
             });
         }

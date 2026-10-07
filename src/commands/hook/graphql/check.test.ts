@@ -45,6 +45,7 @@ describe('dartHookGraphqlCheck', () => {
     getAllChangedFilesSpy.mockRestore();
     isCommandInstalledSpy.mockRestore();
     getGitStatusSpy.mockRestore();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -137,6 +138,30 @@ describe('dartHookGraphqlCheck', () => {
     }).rejects.toThrow('process.exit(0)');
 
     expect(processExitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('should run codegen without the git repository variables a worktree hook exports', async () => {
+    vi.stubEnv('GIT_DIR', '/repo/.git/worktrees/feature');
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/query.graphql']);
+    isCommandInstalledSpy.mockReturnValue(true);
+    getGitStatusSpy.mockReturnValue('');
+
+    await expect(dartHookGraphqlCheck({ verbose: false })).rejects.toThrow('process.exit(0)');
+
+    const melosCalls = vi
+      .mocked(execSync)
+      .mock.calls.filter(([command]) => String(command).startsWith('melos '));
+    expect(melosCalls.map(([command]) => command)).toEqual([
+      'melos run codegen:graphql',
+      'melos run codegen:graphql:test',
+    ]);
+    for (const [, options] of melosCalls) {
+      expect(options?.env).toBeDefined();
+      expect(options?.env?.GIT_DIR).toBeUndefined();
+      expect(options?.env?.PATH).toBe(process.env.PATH);
+    }
   });
 
   it('should exit with success if no GraphQL files modified (non-verbose)', async () => {

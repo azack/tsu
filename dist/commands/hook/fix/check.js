@@ -6,6 +6,7 @@ import { escapeShellArg } from '../../../utils/shell.js';
 import { ensureCondition, ensureDartInstalled, displayFileList, } from '../../../utils/command-helpers.js';
 import { logIfVerbose } from '../../../utils/logger.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 export function dartHookFixCheck(options = {}) {
     const verbose = options.verbose || false;
     const excludeSuffixes = options.excludeSuffixes || [...COMMON_DART_CODEGEN_SUFFIXES];
@@ -32,6 +33,7 @@ export function dartHookFixCheck(options = {}) {
             const fileArg = escapeShellArg(file);
             execSync(`dart fix --apply ${fileArg}`, {
                 cwd,
+                env: withoutGitRepositoryEnv(),
                 stdio: 'pipe',
             });
         }
