@@ -3,9 +3,10 @@ name: Auto Version Bump
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+# Runs on push rather than pull_request so merges of fork PRs get a write
+# token; a fork's pull_request run only gets a read-only GITHUB_TOKEN.
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -13,9 +14,17 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: auto-version-bump
+  cancel-in-progress: false
+
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true && github.event.pull_request.user.login != 'github-actions[bot]'
+    # Skip merges of the bump PR itself, whether squashed or merge-committed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!startsWith(github.event.head_commit.message, 'chore: bump version to') &&
+      !contains(github.event.head_commit.message, '/bump-version-'))
     runs-on: ubuntu-latest
 
     steps:
@@ -70,6 +79,6 @@ jobs:
           body: |
             Automated version bump to ${{ env.VERSION }}
 
-            This PR was automatically created after merging PR #${{ github.event.pull_request.number }}.
+            This PR was automatically created after ${{ github.sha }} landed on main.
           commit-message: "chore: bump version to ${{ env.VERSION }}"
           delete-branch: true
