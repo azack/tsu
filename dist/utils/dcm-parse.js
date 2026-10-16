@@ -31,6 +31,14 @@ export function isOnlyDcmVersionWarning(output) {
     }
     return true;
 }
+const DCM_FINISHED_RUN_STDERR_LINE = /^✖\s+total\s.+\s-\s\d+$|^✔|^✓|Analysis is completed|no issues found|Preparing the results/;
+function isOnlyFinishedRunStderr(stderr) {
+    return stderr
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .every((line) => DCM_VERSION_WARNING_PATTERN.test(line) || DCM_FINISHED_RUN_STDERR_LINE.test(line));
+}
 export function handleDcmVersionWarning(output) {
     if (isDcmVersionWarning(output)) {
         const match = output.match(DCM_VERSION_WARNING_PATTERN);
@@ -83,6 +91,9 @@ function processDcmError(error, cwd, timeout) {
             logIfVerbose(undefined, `Ignoring DCM findings in ${excludedFiles.size} file(s) their package's analysis_options.yaml excludes: ${[...excludedFiles].join(', ')}`);
         }
         if (filesWithIssues.length > 0 && reportableFiles.length === 0) {
+            if (!isOnlyFinishedRunStderr(stderr)) {
+                throw new Error(`DCM analyze failed in ${cwd}: findings were only in excluded files, but DCM also wrote: ${stderr.trim()}`);
+            }
             return {
                 success: true,
                 output: stdout,

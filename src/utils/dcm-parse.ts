@@ -91,6 +91,24 @@ export function isOnlyDcmVersionWarning(output: string): boolean {
   return true;
 }
 
+/** Lines DCM writes to stderr on a run that finished normally: issue summaries and completion notes. */
+const DCM_FINISHED_RUN_STDERR_LINE =
+  /^✖\s+total\s.+\s-\s\d+$|^✔|^✓|Analysis is completed|no issues found|Preparing the results/;
+
+/**
+ * True when every stderr line is one DCM prints on a finished run (or stderr is empty), so a
+ * non-zero exit is explained by the findings rather than by an execution or config error.
+ */
+function isOnlyFinishedRunStderr(stderr: string): boolean {
+  return stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .every(
+      (line) => DCM_VERSION_WARNING_PATTERN.test(line) || DCM_FINISHED_RUN_STDERR_LINE.test(line)
+    );
+}
+
 /**
  * Extracts and logs DCM version warnings from output if present.
  * Logs warnings only in verbose mode to avoid cluttering output.
@@ -214,6 +232,12 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
     }
 
     if (filesWithIssues.length > 0 && reportableFiles.length === 0) {
+      // Dropping every finding is only safe when nothing else explains the non-zero exit
+      if (!isOnlyFinishedRunStderr(stderr)) {
+        throw new Error(
+          `DCM analyze failed in ${cwd}: findings were only in excluded files, but DCM also wrote: ${stderr.trim()}`
+        );
+      }
       return {
         success: true,
         output: stdout,

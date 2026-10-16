@@ -442,6 +442,25 @@ describe('dcmAnalyze with package excludes', () => {
         expect(result.success).toBe(false);
         expect(result.filesWithIssues).toEqual(['features/lib/menu.dart']);
     });
+    const runnerWithStderr = (stdout, stderr) => () => {
+        const error = new Error('DCM found issues');
+        error.stdout = stdout;
+        error.stderr = stderr;
+        throw error;
+    };
+    const excludedOnlyReport = featuresConfig + report(['features/test/support/support.dart']);
+    const excludedOnlyFiles = { cwd: '/repo', files: ['features/test/support/support.dart'] };
+    it('should throw when every finding is excluded but DCM also wrote an error', () => {
+        expect(() => dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, '✖ total lint style issues - 2\nUnexpected error while analyzing'), fileExists)).toThrow('Unexpected error while analyzing');
+    });
+    it('should pass when every finding is excluded and stderr has only a version warning and summary', () => {
+        const result = dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, 'Installed DCM version (1.30.0) does not match the configured constraint 1.29.0\n✖ total lint warnings - 1'), fileExists);
+        expect(result.success).toBe(true);
+    });
+    it('should pass when every finding is excluded and stderr is empty', () => {
+        const result = dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, ''), fileExists);
+        expect(result.success).toBe(true);
+    });
     it('should throw with stderr when DCM printed configs but no report', () => {
         const runner = () => {
             const error = new Error('DCM failed');
