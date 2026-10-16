@@ -35,6 +35,7 @@ describe('dartHookFormatCheck', () => {
         isDartPackageSpy.mockRestore();
         getAllChangedFilesSpy.mockRestore();
         isCommandInstalledSpy.mockRestore();
+        vi.unstubAllEnvs();
         vi.clearAllMocks();
     });
     it('should exit with error if not in a git repository', () => {
@@ -86,6 +87,22 @@ describe('dartHookFormatCheck', () => {
             dartHookFormatCheck({ verbose: true });
         }).toThrow('process.exit(0)');
         expect(getAllChangedFilesSpy).toHaveBeenCalled();
+    });
+    it('should run dart format without the git repository variables a worktree hook exports', () => {
+        vi.stubEnv('GIT_DIR', '/repo/.git/worktrees/feature');
+        isGitRepoSpy.mockReturnValue(true);
+        isDartPackageSpy.mockReturnValue(true);
+        getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+        const hasUnstagedChangesSpy = vi.spyOn(gitUtils, 'hasUnstagedChanges').mockReturnValue(false);
+        expect(() => {
+            dartHookFormatCheck({ verbose: false });
+        }).toThrow('process.exit(0)');
+        const formatCall = vi
+            .mocked(execSync)
+            .mock.calls.find(([command]) => String(command).startsWith('dart format '));
+        expect(formatCall?.[1]?.env).toBeDefined();
+        expect(formatCall?.[1]?.env?.GIT_DIR).toBeUndefined();
+        hasUnstagedChangesSpy.mockRestore();
     });
     it('should display file list in verbose mode when running dart format', () => {
         isGitRepoSpy.mockReturnValue(true);

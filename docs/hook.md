@@ -6,6 +6,8 @@ Git / Claude hook utilities for Dart/Flutter projects.
 - All hook commands must be run in a git repository
 - Dart-specific hooks (`format`, `analysis`, `fix`, `dcm`, `graphql`) must be run in a Dart package
 
+The `tsu hook` commands run Dart, Flutter, DCM and melos without the repository-local variables `git rev-parse --local-env-vars` lists, some of which git exports to hooks (`GIT_DIR` among them in a linked worktree). From a linked worktree, `GIT_DIR` otherwise makes Flutter read this repository's HEAD as its own, rebuild its tool and report a bogus Flutter version, which fails `pub get`. A hook that runs those tools itself should clear the variables first, as the `fix` actions in `templates/hk.pkl` do.
+
 ## Available Commands
 
 ```bash

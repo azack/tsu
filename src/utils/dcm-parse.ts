@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { logIfVerbose } from './logger.js';
 import { escapeShellArg } from './shell.js';
+import { withoutGitRepositoryEnv } from './without-git-repository-env.js';
 
 interface DcmAnalyzeResult {
   path: string;
@@ -155,6 +156,7 @@ function runDcm(cwd: string, timeout: number, files: string[]): string {
     `dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`,
     {
       cwd,
+      env: withoutGitRepositoryEnv(),
       stdio: 'pipe',
       timeout,
       encoding: 'utf-8',

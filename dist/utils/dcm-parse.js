@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { logIfVerbose } from './logger.js';
 import { escapeShellArg } from './shell.js';
+import { withoutGitRepositoryEnv } from './without-git-repository-env.js';
 const DCM_VERSION_WARNING_PATTERN = /Installed\s+DCM\s+version\s+\([\d.]+\)\s+does\s+not\s+match\s+the\s+configured\s+constraint\s+[\d.]+\.?/;
 export function isDcmVersionWarning(output) {
     return DCM_VERSION_WARNING_PATTERN.test(output);
@@ -60,6 +61,7 @@ function runDcm(cwd, timeout, files) {
     const targets = files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
     return execSync(`dcm analyze ${targets} --fatal-style --fatal-warnings --no-congratulate --reporter=json`, {
         cwd,
+        env: withoutGitRepositoryEnv(),
         stdio: 'pipe',
         timeout,
         encoding: 'utf-8',
