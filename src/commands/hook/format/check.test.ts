@@ -44,6 +44,7 @@ describe('dartHookFormatCheck', () => {
     isDartPackageSpy.mockRestore();
     getAllChangedFilesSpy.mockRestore();
     isCommandInstalledSpy.mockRestore();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -130,7 +131,6 @@ describe('dartHookFormatCheck', () => {
     expect(formatCall?.[1]?.env?.GIT_DIR).toBeUndefined();
 
     hasUnstagedChangesSpy.mockRestore();
-    vi.unstubAllEnvs();
   });
 
   it('should display file list in verbose mode when running dart format', () => {

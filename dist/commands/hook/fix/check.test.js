@@ -35,6 +35,7 @@ describe('dartHookFixCheck', () => {
         isDartPackageSpy.mockRestore();
         getAllChangedFilesSpy.mockRestore();
         isCommandInstalledSpy.mockRestore();
+        vi.unstubAllEnvs();
         vi.clearAllMocks();
     });
     it('should exit with error if not in a git repository', () => {
@@ -102,7 +103,6 @@ describe('dartHookFixCheck', () => {
         expect(fixCall?.[1]?.env).toBeDefined();
         expect(fixCall?.[1]?.env?.GIT_DIR).toBeUndefined();
         hasUnstagedChangesSpy.mockRestore();
-        vi.unstubAllEnvs();
     });
     it('should display file list in verbose mode when running dart fix', () => {
         isGitRepoSpy.mockReturnValue(true);

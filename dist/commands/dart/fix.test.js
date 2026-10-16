@@ -41,6 +41,7 @@ describe('dartFix', () => {
         escapeShellArgSpy.mockRestore();
         findAffectedPackagesSpy.mockRestore();
         readPackageNameSpy.mockRestore();
+        vi.unstubAllEnvs();
         vi.clearAllMocks();
     });
     it('should exit with success if dart is not installed', () => {
@@ -105,7 +106,6 @@ describe('dartFix', () => {
             .mock.calls.find(([command]) => String(command).startsWith('dart fix'));
         expect(fixCall?.[1]?.env).toBeDefined();
         expect(fixCall?.[1]?.env?.GIT_DIR).toBeUndefined();
-        vi.unstubAllEnvs();
     });
     it.skip('should run dart fix with --apply when apply option is true', () => {
         isCommandInstalledSpy.mockReturnValue(true);
