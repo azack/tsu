@@ -12,6 +12,8 @@ describe('dartHookDcmAnalyzeCheck', () => {
     let isDartPackageSpy;
     let getAllChangedFilesSpy;
     let isCommandInstalledSpy;
+    let getGitRootSpy;
+    let findUnresolvedPackageRootsSpy;
     beforeEach(() => {
         resetVerbose();
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
@@ -23,6 +25,10 @@ describe('dartHookDcmAnalyzeCheck', () => {
         getAllChangedFilesSpy = vi.spyOn(gitUtils, 'getAllChangedFiles');
         isCommandInstalledSpy = vi.spyOn(shellUtils, 'isCommandInstalled');
         isCommandInstalledSpy.mockReturnValue(true);
+        getGitRootSpy = vi.spyOn(gitUtils, 'getGitRoot').mockReturnValue(process.cwd());
+        findUnresolvedPackageRootsSpy = vi
+            .spyOn(dartUtils, 'findUnresolvedPackageRoots')
+            .mockReturnValue([]);
     });
     afterEach(() => {
         consoleErrorSpy.mockRestore();
@@ -31,6 +37,8 @@ describe('dartHookDcmAnalyzeCheck', () => {
         isDartPackageSpy.mockRestore();
         getAllChangedFilesSpy.mockRestore();
         isCommandInstalledSpy.mockRestore();
+        getGitRootSpy.mockRestore();
+        findUnresolvedPackageRootsSpy.mockRestore();
         vi.clearAllMocks();
     });
     it('should exit with error if not in a git repository', () => {

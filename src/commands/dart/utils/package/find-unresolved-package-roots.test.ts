@@ -53,6 +53,15 @@ describe('findUnresolvedPackageRoots', () => {
     ]);
   });
 
+  it('should check a package whose directory name starts with two dots', () => {
+    write(join(repo, '..hidden', 'pubspec.yaml'));
+    write(join(repo, '..hidden', 'lib', 'a.dart'));
+
+    expect(findUnresolvedPackageRoots(['..hidden/lib/a.dart'], repo, repo)).toEqual([
+      join(repo, '..hidden'),
+    ]);
+  });
+
   it("should accept a package's own package config", () => {
     write(join(repo, 'tool', '.dart_tool', 'package_config.json'), '{}');
 

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { findDartPackageRoot } from './find-dart-package-root.js';
 
 /**
@@ -34,7 +34,10 @@ export function findUnresolvedPackageRoots(
 
 function isInside(path: string, boundary: string): boolean {
   const fromBoundary = relative(boundary, path);
-  return !fromBoundary.startsWith('..') && !isAbsolute(fromBoundary);
+  // Match `..` as a whole path component, so a directory such as `..hidden` still counts as inside
+  const outside =
+    fromBoundary === '..' || fromBoundary.startsWith(`..${sep}`) || isAbsolute(fromBoundary);
+  return !outside;
 }
 
 function hasPackageConfig(packageRoot: string, boundary: string): boolean {

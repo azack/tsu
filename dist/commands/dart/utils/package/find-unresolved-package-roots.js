@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { findDartPackageRoot } from './find-dart-package-root.js';
 export function findUnresolvedPackageRoots(files, cwd, repoRoot) {
     const boundary = resolve(repoRoot);
@@ -16,7 +16,8 @@ export function findUnresolvedPackageRoots(files, cwd, repoRoot) {
 }
 function isInside(path, boundary) {
     const fromBoundary = relative(boundary, path);
-    return !fromBoundary.startsWith('..') && !isAbsolute(fromBoundary);
+    const outside = fromBoundary === '..' || fromBoundary.startsWith(`..${sep}`) || isAbsolute(fromBoundary);
+    return !outside;
 }
 function hasPackageConfig(packageRoot, boundary) {
     let directory = packageRoot;
