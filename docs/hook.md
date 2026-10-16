@@ -6,6 +6,8 @@ Git / Claude hook utilities for Dart/Flutter projects.
 - All hook commands must be run in a git repository
 - Dart-specific hooks (`format`, `analysis`, `fix`, `dcm`, `graphql`) must be run in a Dart package
 
+The `tsu hook` commands run Dart, Flutter, DCM and melos without the repository-local variables `git rev-parse --local-env-vars` lists, some of which git exports to hooks (`GIT_DIR` among them in a linked worktree). From a linked worktree, `GIT_DIR` otherwise makes Flutter read this repository's HEAD as its own, rebuild its tool and report a bogus Flutter version, which fails `pub get`. A hook that runs those tools itself should clear the variables first, as the `fix` actions in `templates/hk.pkl` do.
+
 ## Available Commands
 
 ```bash
@@ -77,7 +79,9 @@ Runs dart analyze on Dart files about to be pushed (excluding generated files) a
 2. Filters out generated files
 3. Maps files to their package roots
 4. Runs `dart analyze` on each unique package
-5. Exits with error if dart analyze reports any issues
+5. Exits with error if dart analyze reports any issues or fails to run
+
+If a package's `dart analyze` does not finish within `--timeout <ms>` (default 20000) and no other package reports issues, the check prints a warning and exits 0, as the DCM analyze check does: a timeout says nothing about the code, so it does not block the push. Issues another package reports still block it, and the message also names the packages that timed out. Analysis loads the whole package, so a large package can need more than the default even for one file.
 
 **Requirements**: 
 - Must be run in a git repository
@@ -147,8 +151,9 @@ Runs DCM analyze on Dart files about to be pushed (excluding generated files) an
 1. Checks if DCM is installed, skips if not
 2. Gets Dart files about to be pushed (or based on `--staged`, `--unstaged`, `--all` options)
 3. Filters out generated files
-4. Runs one `dcm analyze <files…>` from the current directory, which applies each file's own package `analysis_options.yaml` without analyzing whole packages
-5. Exits with error if DCM analyze reports any issues or fails to run
+4. Runs one `dcm analyze <files…> --print-config` from the repository root, which applies each file's own package `analysis_options.yaml` rules without analyzing whole packages
+5. Ignores findings in files their package excludes through `analyzer: exclude` or `dart_code_metrics: rules-exclude`. DCM only applies those excludes when it scans a directory, so the check reads them from the configs `--print-config` prints. A package that excludes `test/**`, for example, isn't held to its rules in tests.
+6. Exits with error if DCM analyze reports any other issues or fails to run
 
 If DCM does not finish within `--timeout <ms>` (default 20000), the check prints a warning and exits 0: a timeout says nothing about the code, so it does not block the push.
 

@@ -3,23 +3,51 @@ name: Auto Version Bump
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+# Runs on push rather than pull_request so merges of fork PRs get a write
+# token; a fork's pull_request run only gets a read-only GITHUB_TOKEN.
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: auto-version-bump
+  cancel-in-progress: false
 
 jobs:
-  bump-version:
-    if: github.event.pull_request.merged == true && github.event.pull_request.user.login != 'github-actions[bot]'
+  detect-bump-merge:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      is-bump-merge: ${{ steps.check.outputs.is-bump-merge }}
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts
+
+      - name: Check whether this push merged the bump PR
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          result=$(scripts/is-bump-pr-commit.sh "$GITHUB_SHA" "$GITHUB_REPOSITORY")
+          echo "is-bump-merge=$result" >> "$GITHUB_OUTPUT"
+
+  bump-version:
+    needs: detect-bump-merge
+    if: github.event_name == 'workflow_dispatch' || needs.detect-bump-merge.outputs.is-bump-merge == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -59,7 +87,7 @@ jobs:
           echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           # One fixed branch, so each merge updates the open bump PR instead of
           # opening a competing one for the same version. tag-version.yml keys
@@ -70,6 +98,6 @@ jobs:
           body: |
             Automated version bump to ${{ env.VERSION }}
 
-            This PR was automatically created after merging PR #${{ github.event.pull_request.number }}.
+            This PR was automatically created after ${{ github.sha }} landed on main.
           commit-message: "chore: bump version to ${{ env.VERSION }}"
           delete-branch: true

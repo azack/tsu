@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { parseDartAnalyzeOutput, dartAnalyze } from './dart-analyze-parse.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  parseDartAnalyzeOutput,
+  dartAnalyze,
+  DartAnalyzeTimeoutError,
+} from './dart-analyze-parse.js';
 
 describe('parseDartAnalyzeOutput', () => {
   it('should parse single issue from dart analyze output', () => {
@@ -194,7 +201,26 @@ describe('dartAnalyze', () => {
 
     expect(() => {
       dartAnalyze({ cwd: '/test/path' }, mockRunner);
-    }).toThrow('dart analyze timed out');
+    }).toThrow(new DartAnalyzeTimeoutError('/test/path', 20000));
+  });
+
+  it('should not report an outside SIGTERM as a timeout', () => {
+    const mockRunner = () => {
+      const error: any = new Error('Terminated');
+      error.signal = 'SIGTERM';
+      throw error;
+    };
+
+    let thrown: unknown;
+    try {
+      dartAnalyze({ cwd: '/test/path' }, mockRunner);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown).not.toBeInstanceOf(DartAnalyzeTimeoutError);
+    expect((thrown as Error).message).toBe('dart analyze in /test/path was terminated by SIGTERM');
   });
 
   it('should throw error when dart analyze fails without output', () => {
@@ -416,5 +442,66 @@ describe('dartAnalyze', () => {
     expect(result.success).toBe(true);
     // Should have analyzed at least one package
     expect(packageRootsUsed.length).toBeGreaterThan(0);
+  });
+});
+
+describe('dartAnalyze when one of several packages times out', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'tsu-analyze-')));
+    for (const name of ['a', 'b']) {
+      mkdirSync(join(root, name, 'lib'), { recursive: true });
+      writeFileSync(join(root, name, 'pubspec.yaml'), `name: ${name}\n`);
+      writeFileSync(join(root, name, 'lib', `${name}.dart`), '');
+    }
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const runnerWith =
+    (outcomes: Record<string, 'issue' | 'timeout' | 'clean'>) => (packageRoot: string) => {
+      const outcome = outcomes[packageRoot.slice(root.length + 1)];
+      if (outcome === 'clean') {
+        return 'No issues found!';
+      }
+      const error: any = new Error('dart analyze failed');
+      if (outcome === 'timeout') {
+        error.code = 'ETIMEDOUT';
+      } else {
+        error.stdout = "  error - lib/a.dart:1:1 - Undefined name 'x'. - undefined_identifier\n";
+      }
+      throw error;
+    };
+
+  it.each([
+    ['a/lib/a.dart', 'b/lib/b.dart'],
+    ['b/lib/b.dart', 'a/lib/a.dart'],
+  ])('should keep the issues one package reports when another times out (%s first)', (...files) => {
+    const result = dartAnalyze({ cwd: root, files }, runnerWith({ a: 'issue', b: 'timeout' }));
+
+    expect(result.success).toBe(false);
+    expect(result.filesWithIssues).toEqual(['lib/a.dart']);
+    expect(result.timedOutPackageRoots).toEqual([join(root, 'b')]);
+  });
+
+  it('should throw a timeout when every package times out', () => {
+    expect(() =>
+      dartAnalyze(
+        { cwd: root, files: ['a/lib/a.dart', 'b/lib/b.dart'] },
+        runnerWith({ a: 'timeout', b: 'timeout' })
+      )
+    ).toThrow(DartAnalyzeTimeoutError);
+  });
+
+  it('should throw a timeout when the only other package is clean', () => {
+    expect(() =>
+      dartAnalyze(
+        { cwd: root, files: ['a/lib/a.dart', 'b/lib/b.dart'] },
+        runnerWith({ a: 'clean', b: 'timeout' })
+      )
+    ).toThrow(new DartAnalyzeTimeoutError(join(root, 'b'), 20000));
   });
 });

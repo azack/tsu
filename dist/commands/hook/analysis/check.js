@@ -3,8 +3,9 @@ import { isDartPackage, COMMON_DART_CODEGEN_SUFFIXES } from '../../dart/utils/da
 import { filterFilesBySuffix } from '../../files/utils/files.js';
 import { ensureCondition, ensureDartInstalled, ensurePackagesResolved, displayFileList, } from '../../../utils/command-helpers.js';
 import { logIfVerbose } from '../../../utils/logger.js';
-import { dartAnalyze } from '../../../utils/dart-analyze-parse.js';
+import { dartAnalyze, DartAnalyzeTimeoutError } from '../../../utils/dart-analyze-parse.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+export const DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS = 20000;
 export function dartHookAnalysisCheck(options = {}) {
     const verbose = options.verbose || false;
     const excludeSuffixes = options.excludeSuffixes || [...COMMON_DART_CODEGEN_SUFFIXES];
@@ -28,7 +29,21 @@ export function dartHookAnalysisCheck(options = {}) {
     });
     const repoRoot = getGitRoot(cwd) ?? cwd;
     ensurePackagesResolved(modifiedFiles, repoRoot, repoRoot, 'dart analyze');
-    const result = dartAnalyze({ cwd, timeout: 20000, files: modifiedFiles });
+    const timeout = options.timeout ?? DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS;
+    let result;
+    try {
+        result = dartAnalyze({ cwd, timeout, files: modifiedFiles });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof DartAnalyzeTimeoutError) {
+            console.error(`⚠️  ${message}; skipping dart analyze check.`);
+            console.error('Raise the limit with --timeout <ms>.');
+            process.exit(0);
+        }
+        console.error(`❌ Push blocked: ${message}`);
+        process.exit(1);
+    }
     if (!result.success) {
         const filesWithIssues = result.filesWithIssues;
         console.error('');
@@ -36,6 +51,10 @@ export function dartHookAnalysisCheck(options = {}) {
         filesWithIssues.forEach((file) => {
             console.error(`  ${file}`);
         });
+        if (result.timedOutPackageRoots) {
+            console.error('');
+            console.error(`dart analyze also timed out in ${result.timedOutPackageRoots.join(', ')} after ${timeout}ms.`);
+        }
         console.error('');
         console.error('Run `dart fix --apply` to fix some issues automatically.');
         process.exit(1);

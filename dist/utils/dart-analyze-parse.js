@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve, dirname, relative } from 'node:path';
 import { findDartPackageRoot } from '../commands/dart/utils/dart.js';
 import { escapeShellArg } from './shell.js';
+import { withoutGitRepositoryEnv } from './without-git-repository-env.js';
 export function parseDartAnalyzeOutput(output) {
     const issues = [];
     const issuePattern = /^\s*(info|warning|error)\s+[•-]\s+([^:]+):(\d+):(\d+)\s+[•-]\s+([^•-]+)\s+[•-]\s+(\S+)/gm;
@@ -30,15 +31,25 @@ function runDartAnalyzeForPackage(packageRoot, timeout, files) {
     const fileArgs = files && files.length > 0 ? files.map((f) => escapeShellArg(f)).join(' ') : '.';
     return execSync(`dart analyze ${fileArgs} --fatal-infos --fatal-warnings`, {
         cwd: packageRoot,
+        env: withoutGitRepositoryEnv(),
         stdio: 'pipe',
         timeout,
         encoding: 'utf-8',
     });
 }
+export class DartAnalyzeTimeoutError extends Error {
+    constructor(packageRoot, timeout) {
+        super(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
+        this.name = 'DartAnalyzeTimeoutError';
+    }
+}
 function processDartAnalyzeError(error, packageRoot, timeout) {
     const err = error;
-    if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
-        throw new Error(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
+    if (err.code === 'ETIMEDOUT') {
+        throw new DartAnalyzeTimeoutError(packageRoot, timeout);
+    }
+    if (err.signal === 'SIGTERM') {
+        throw new Error(`dart analyze in ${packageRoot} was terminated by SIGTERM`);
     }
     const stdout = err.stdout?.toString() || '';
     const stderr = err.stderr?.toString() || '';
@@ -75,6 +86,7 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
     let allSuccess = true;
     const allIssues = [];
     let combinedOutput = '';
+    const timedOutPackageRoots = [];
     for (const [packageRoot, packageFiles] of packageToFiles.entries()) {
         const filesToAnalyze = packageFiles.length > 0 ? packageFiles : undefined;
         try {
@@ -82,11 +94,24 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
             combinedOutput += output;
         }
         catch (error) {
-            const result = processDartAnalyzeError(error, packageRoot, timeout);
+            let result;
+            try {
+                result = processDartAnalyzeError(error, packageRoot, timeout);
+            }
+            catch (processError) {
+                if (processError instanceof DartAnalyzeTimeoutError) {
+                    timedOutPackageRoots.push(packageRoot);
+                    continue;
+                }
+                throw processError;
+            }
             allSuccess = false;
             combinedOutput += result.output;
             allIssues.push(...result.issues);
         }
+    }
+    if (allSuccess && timedOutPackageRoots.length > 0) {
+        throw new DartAnalyzeTimeoutError(timedOutPackageRoots.join(', '), timeout);
     }
     const filesWithIssues = [...new Set(allIssues.map((issue) => issue.filePath))];
     return {
@@ -94,5 +119,6 @@ export function dartAnalyze(options, dartAnalyzeRunner = runDartAnalyzeForPackag
         filesWithIssues,
         issues: allIssues,
         rawOutput: combinedOutput,
+        ...(timedOutPackageRoots.length > 0 ? { timedOutPackageRoots } : {}),
     };
 }

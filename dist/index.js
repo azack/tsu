@@ -1,5 +1,6 @@
 export { isGitRepo, getGitRoot, getChangedFiles, getChangedFilesWithStatus, getAllChangedFiles, getAllChangedFilesWithStatus, getFilesInRange, getFilesInRangeWithStatus, getFilesToPush, getFilesToPushWithStatus, isCodeownersRelevant, getCurrentBranch, resolveBaseRef, getStagedDiff, getBranchDiff, isMainBranch, callClaude, generateCommitMessage, generatePRDescription, createCommit, hasUnstagedChanges, } from './commands/git/utils/git.js';
 export { escapeShellArg, isCommandInstalled, isSafeShellInput, safeShellArg, } from './utils/shell.js';
+export { GIT_REPOSITORY_ENV_VARS, withoutGitRepositoryEnv, } from './utils/without-git-repository-env.js';
 export { filterFilesBySuffix } from './commands/files/utils/files.js';
 export { setVerbose, isVerbose, resetVerbose } from './utils/verbose-state.js';
 export { displayChangedFiles, getChangedFilesWithOptions, ensureCondition, ensureDartInstalled, ensureDCMInstalled, ensureClaudeInstalled, } from './utils/command-helpers.js';

@@ -6,6 +6,7 @@ import { isCommandInstalled } from '../../../utils/shell.js';
 import { logIfVerbose } from '../../../utils/logger.js';
 import type { ChangedFilesOptions } from '../../../types/command-options.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 
 export type DartHookGraphqlCheckOptions = ChangedFilesOptions;
 
@@ -77,6 +78,7 @@ export async function dartHookGraphqlCheck(
     for (const command of codegenCommands) {
       execSync(command, {
         cwd,
+        env: withoutGitRepositoryEnv(),
         stdio: verbose ? 'inherit' : 'pipe',
       });
     }

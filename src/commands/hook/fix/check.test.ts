@@ -44,6 +44,7 @@ describe('dartHookFixCheck', () => {
     isDartPackageSpy.mockRestore();
     getAllChangedFilesSpy.mockRestore();
     isCommandInstalledSpy.mockRestore();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -110,6 +111,26 @@ describe('dartHookFixCheck', () => {
     }).toThrow('process.exit(0)');
 
     expect(getAllChangedFilesSpy).toHaveBeenCalled();
+  });
+
+  it('should run dart fix without the git repository variables a worktree hook exports', () => {
+    vi.stubEnv('GIT_DIR', '/repo/.git/worktrees/feature');
+    isGitRepoSpy.mockReturnValue(true);
+    isDartPackageSpy.mockReturnValue(true);
+    getAllChangedFilesSpy.mockReturnValue(['lib/main.dart']);
+    const hasUnstagedChangesSpy = vi.spyOn(gitUtils, 'hasUnstagedChanges').mockReturnValue(false);
+
+    expect(() => {
+      dartHookFixCheck({});
+    }).toThrow('process.exit(0)');
+
+    const fixCall = vi
+      .mocked(execSync)
+      .mock.calls.find(([command]) => String(command).startsWith('dart fix --apply '));
+    expect(fixCall?.[1]?.env).toBeDefined();
+    expect(fixCall?.[1]?.env?.GIT_DIR).toBeUndefined();
+
+    hasUnstagedChangesSpy.mockRestore();
   });
 
   it('should display file list in verbose mode when running dart fix', () => {

@@ -19,7 +19,10 @@ import { dartPackage } from './commands/dart/package.js';
 import { dartChanged } from './commands/dart/changed/index.js';
 import { dartChangedDownstream } from './commands/dart/changed/downstream.js';
 import { dartHookFormatCheck } from './commands/hook/format/check.js';
-import { dartHookAnalysisCheck } from './commands/hook/analysis/check.js';
+import {
+  dartHookAnalysisCheck,
+  DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS,
+} from './commands/hook/analysis/check.js';
 import { dartHookFixCheck } from './commands/hook/fix/check.js';
 import { dartHookDcmCheck } from './commands/hook/dcm/fix/check.js';
 import {
@@ -311,6 +314,12 @@ hook
   .option('-u, --unstaged', 'check unstaged changes only')
   .option('-a, --all', 'check all changes (committed, staged, and unstaged)')
   .option('-b, --base-branch <branch>', 'base branch to compare against', 'main')
+  .option(
+    '--timeout <ms>',
+    'timeout in milliseconds for each package',
+    parsePositiveInt,
+    DEFAULT_HOOK_ANALYSIS_TIMEOUT_MS
+  )
   .option('-v, --verbose', 'show human-readable status messages (output to stderr)')
   .action(
     (options: {
@@ -318,6 +327,7 @@ hook
       unstaged?: boolean;
       all?: boolean;
       baseBranch?: string;
+      timeout?: number;
       verbose?: boolean;
     }) => {
       dartHookAnalysisCheck(options);

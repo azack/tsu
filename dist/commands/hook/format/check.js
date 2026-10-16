@@ -6,6 +6,7 @@ import { escapeShellArg } from '../../../utils/shell.js';
 import { logIfVerbose } from '../../../utils/logger.js';
 import { ensureCondition, ensureDartInstalled, displayFileList, } from '../../../utils/command-helpers.js';
 import { setVerbose } from '../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../utils/without-git-repository-env.js';
 export function dartHookFormatCheck(options = {}) {
     const verbose = options.verbose || false;
     const excludeSuffixes = options.excludeSuffixes || [...COMMON_DART_CODEGEN_SUFFIXES];
@@ -31,6 +32,7 @@ export function dartHookFormatCheck(options = {}) {
         const fileArgs = modifiedFiles.map(escapeShellArg).join(' ');
         execSync(`dart format ${fileArgs}`, {
             cwd,
+            env: withoutGitRepositoryEnv(),
             stdio: 'pipe',
         });
     }

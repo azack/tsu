@@ -7,6 +7,7 @@ import { ensureCondition, ensureDCMInstalled, displayFileList, } from '../../../
 import { logIfVerbose } from '../../../../utils/logger.js';
 import { handleDcmVersionWarning, isOnlyDcmVersionWarning } from '../../../../utils/dcm-parse.js';
 import { setVerbose } from '../../../../utils/verbose-state.js';
+import { withoutGitRepositoryEnv } from '../../../../utils/without-git-repository-env.js';
 export function dartHookDcmCheck(options = {}) {
     const verbose = options.verbose || false;
     const excludeSuffixes = options.excludeSuffixes || [...COMMON_DART_CODEGEN_SUFFIXES];
@@ -32,6 +33,7 @@ export function dartHookDcmCheck(options = {}) {
         const fileArgs = modifiedFiles.map(escapeShellArg).join(' ');
         const output = execSync(`dcm fix ${fileArgs}`, {
             cwd,
+            env: withoutGitRepositoryEnv(),
             stdio: 'pipe',
             encoding: 'utf-8',
         });
