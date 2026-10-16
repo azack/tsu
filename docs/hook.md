@@ -79,7 +79,9 @@ Runs dart analyze on Dart files about to be pushed (excluding generated files) a
 2. Filters out generated files
 3. Maps files to their package roots
 4. Runs `dart analyze` on each unique package
-5. Exits with error if dart analyze reports any issues
+5. Exits with error if dart analyze reports any issues or fails to run
+
+If a package's `dart analyze` does not finish within `--timeout <ms>` (default 20000) and no other package reports issues, the check prints a warning and exits 0, as the DCM analyze check does: a timeout says nothing about the code, so it does not block the push. Issues another package reports still block it, and the message also names the packages that timed out. Analysis loads the whole package, so a large package can need more than the default even for one file.
 
 **Requirements**: 
 - Must be run in a git repository
