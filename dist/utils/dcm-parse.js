@@ -73,7 +73,7 @@ function processDcmError(error, cwd, timeout) {
     const stderr = err.stderr?.toString() || '';
     handleDcmVersionWarning(stderr);
     handleDcmVersionWarning(stdout);
-    if (stdout.length > 0) {
+    if (splitJsonObjects(stdout).some(isDcmAnalyzeOutput)) {
         const filesWithIssues = parseDcmAnalyzeOutput(stdout);
         const excludedFiles = err.signal
             ? new Set()
@@ -109,7 +109,7 @@ function processDcmError(error, cwd, timeout) {
             filesWithIssues: [],
         };
     }
-    const errorMsg = stderr.length > 0 ? stderr : 'No output from DCM';
+    const errorMsg = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : 'No output from DCM';
     throw new Error(`DCM analyze failed in ${cwd}: ${errorMsg}`);
 }
 export function dcmAnalyze(options, dcmRunner = runDcm, fileExists = existsSync) {

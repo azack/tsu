@@ -600,6 +600,19 @@ describe('dcmAnalyze with package excludes', () => {
     expect(result.filesWithIssues).toEqual(['features/lib/menu.dart']);
   });
 
+  it('should throw with stderr when DCM printed configs but no report', () => {
+    const runner = () => {
+      const error: any = new Error('DCM failed');
+      error.stdout = featuresConfig;
+      error.stderr = 'Unexpected error while analyzing';
+      throw error;
+    };
+
+    expect(() =>
+      dcmAnalyze({ cwd: '/repo', files: ['features/lib/menu.dart'] }, runner, fileExists)
+    ).toThrow('DCM analyze failed in /repo: Unexpected error while analyzing');
+  });
+
   it('should fail when DCM was killed, even if every reported file is excluded', () => {
     const runner = () => {
       const error: any = new Error('Terminated');

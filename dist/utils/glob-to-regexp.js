@@ -43,5 +43,8 @@ export function globToRegExp(glob) {
             source += character;
         }
     }
+    if (braceDepth > 0) {
+        return NEVER_MATCHES;
+    }
     return new RegExp(`^${source}$`);
 }

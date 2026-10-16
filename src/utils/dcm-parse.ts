@@ -196,8 +196,9 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
   handleDcmVersionWarning(stderr);
   handleDcmVersionWarning(stdout);
 
-  if (stdout.length > 0) {
-    // DCM found issues (exit code non-zero but produced JSON output)
+  // With --print-config, stdout holds configs even when DCM aborts before its report
+  if (splitJsonObjects(stdout).some(isDcmAnalyzeOutput)) {
+    // DCM found issues (exit code non-zero but produced a JSON report)
     const filesWithIssues = parseDcmAnalyzeOutput(stdout);
     // A DCM killed by a signal didn't finish, so its partial report is kept as is
     const excludedFiles = err.signal
@@ -248,7 +249,7 @@ function processDcmError(error: unknown, cwd: string, timeout: number): DcmRunRe
   }
 
   // DCM failed to run properly - no output or real errors
-  const errorMsg = stderr.length > 0 ? stderr : 'No output from DCM';
+  const errorMsg = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : 'No output from DCM';
   throw new Error(`DCM analyze failed in ${cwd}: ${errorMsg}`);
 }
 

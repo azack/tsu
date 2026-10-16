@@ -46,5 +46,10 @@ export function globToRegExp(glob: string): RegExp {
     }
   }
 
+  // An unclosed `{` would leave an unterminated group, so it fails closed like a character class
+  if (braceDepth > 0) {
+    return NEVER_MATCHES;
+  }
+
   return new RegExp(`^${source}$`);
 }
