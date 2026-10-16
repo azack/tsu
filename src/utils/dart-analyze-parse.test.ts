@@ -220,6 +220,7 @@ describe('dartAnalyze', () => {
 
     expect(thrown).toBeInstanceOf(Error);
     expect(thrown).not.toBeInstanceOf(DartAnalyzeTimeoutError);
+    expect((thrown as Error).message).toBe('dart analyze in /test/path was terminated by SIGTERM');
   });
 
   it('should throw error when dart analyze fails without output', () => {

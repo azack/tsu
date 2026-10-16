@@ -47,7 +47,7 @@ function processDartAnalyzeError(error, packageRoot, timeout) {
         throw new DartAnalyzeTimeoutError(packageRoot, timeout);
     }
     if (err.signal === 'SIGTERM') {
-        throw new Error(`dart analyze timed out in ${packageRoot} after ${timeout}ms`);
+        throw new Error(`dart analyze in ${packageRoot} was terminated by SIGTERM`);
     }
     const stdout = err.stdout?.toString() || '';
     const stderr = err.stderr?.toString() || '';
