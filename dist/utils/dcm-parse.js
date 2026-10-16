@@ -31,7 +31,7 @@ export function isOnlyDcmVersionWarning(output) {
     }
     return true;
 }
-const DCM_FINISHED_RUN_STDERR_LINE = /^✖\s+total\s.+\s-\s\d+$|^✔|^✓|Analysis is completed|no issues found|Preparing the results/;
+const DCM_FINISHED_RUN_STDERR_LINE = /^(?:✖\s+total\s.+\s-\s\d+$|[✔✓]|(?:Analysis is completed|no issues found|Preparing the results)\b)/i;
 function isOnlyFinishedRunStderr(stderr) {
     return stderr
         .split('\n')

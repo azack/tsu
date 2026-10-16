@@ -93,7 +93,7 @@ export function isOnlyDcmVersionWarning(output: string): boolean {
 
 /** Lines DCM writes to stderr on a run that finished normally: issue summaries and completion notes. */
 const DCM_FINISHED_RUN_STDERR_LINE =
-  /^✖\s+total\s.+\s-\s\d+$|^✔|^✓|Analysis is completed|no issues found|Preparing the results/;
+  /^(?:✖\s+total\s.+\s-\s\d+$|[✔✓]|(?:Analysis is completed|no issues found|Preparing the results)\b)/i;
 
 /**
  * True when every stderr line is one DCM prints on a finished run (or stderr is empty), so a

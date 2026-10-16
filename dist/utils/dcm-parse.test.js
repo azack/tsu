@@ -457,6 +457,9 @@ describe('dcmAnalyze with package excludes', () => {
         const result = dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, 'Installed DCM version (1.30.0) does not match the configured constraint 1.29.0\n✖ total lint warnings - 1'), fileExists);
         expect(result.success).toBe(true);
     });
+    it('should throw when an error line only mentions a completion phrase', () => {
+        expect(() => dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, 'Error: crashed while Preparing the results'), fileExists)).toThrow('crashed while Preparing the results');
+    });
     it('should pass when every finding is excluded and stderr is empty', () => {
         const result = dcmAnalyze(excludedOnlyFiles, runnerWithStderr(excludedOnlyReport, ''), fileExists);
         expect(result.success).toBe(true);

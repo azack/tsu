@@ -635,6 +635,16 @@ describe('dcmAnalyze with package excludes', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should throw when an error line only mentions a completion phrase', () => {
+    expect(() =>
+      dcmAnalyze(
+        excludedOnlyFiles,
+        runnerWithStderr(excludedOnlyReport, 'Error: crashed while Preparing the results'),
+        fileExists
+      )
+    ).toThrow('crashed while Preparing the results');
+  });
+
   it('should pass when every finding is excluded and stderr is empty', () => {
     const result = dcmAnalyze(
       excludedOnlyFiles,
